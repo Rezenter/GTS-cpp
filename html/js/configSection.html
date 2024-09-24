@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Configuration Section</title>
+</head>
+<style>
+    .hide{
+        display:none;
+    }
+</style>
+<body>
+    <div class="row">
+        <p>Select config</p>
+
+    </div>
+    <hr>
+    <div class="row">
+        <p>Display config info</p>
+
+    </div>
+    <hr>
+    <div class="row">
+        <p>And allow to edit config</p>
+
+    </div>
+</body>
+
+<script>
+    function Main () {
+        this.Request = function (req, callback) {
+            $.post('/api', JSON.stringify(req), callback, 'json');
+        };
+
+
+        this.ConnectControls = function () {
+            //$('#ADC_reboot_button').on('click', this, this.ADCReboot);
+        };
+
+        this.GetConfigs = function(){
+            this.Request(
+                {
+                    subsystem: 'diag',
+                    reqtype: 'get_configs'
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }else{
+                        this.UpdateConfigSelects();
+                    }
+                }.bind(this)
+            );
+        }.bind(this);
+
+        this.UpdateConfigSelects = function() {
+            let options = [];
+
+            options = [];
+            this.aqc_configs.configs.forEach(entry => options.push("<option>" + entry + "</option>"));
+            $('.configs').html(options.reverse());
+        };
+
+        this.ConnectControls();
+        this.GetConfigs();
+    }
+
+    $(document).ready(function () {
+            let viewer = new Main();
+        })
+</script>
+</html>

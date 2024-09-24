@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Thomson Scattering control</title>
+    <link rel="icon" href="favicon.ico">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<script src="js/jquery.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script type="text/javascript" src="js/jquery.canvasjs.stock.min.js"></script>
+<link rel="stylesheet" href="js/bootstrap-select.min.css">
+<script type="text/javascript" src="js/bootstrap-select.min.js"></script>
+
+<div>
+    <ul class="nav nav-tabs">
+      <li><a data-toggle="tab" href="#tab1">Configuration</a></li>
+        <!--<li class="active"><a data-toggle="tab" href="#tab2">Acquisition</a></li>-->
+        <!--<li><a data-toggle="tab" href="#tab3">View</a></li>-->
+      <!--<li><a data-toggle="tab" href="#tab4">Calibration</a></li>-->
+    </ul>
+
+    <div class="tab-content container-fluid">
+      <div id="tab1" class="tab-pane fade in active"></div>
+        <!--<div id="tab2" class="tab-pane fade"></div>-->
+        <!--<div id="tab3" class="tab-pane fade"></div>-->
+      <!--<div id="tab4" class="tab-pane fade"></div>-->
+    </div>
+</div>
+
+
+<script>
+    $(document).ready(
+        function () {
+            $('#tab1').load('js/configSection.html');
+            //$('#tab2').load('js/acquisitionSection.html');
+            //$('#tab3').load('js/viewSection.html');
+            //$('#tab4').load('js/calibrSection.html');
+        }
+    )
+</script>
+</body>
+</html>

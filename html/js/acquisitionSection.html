@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Acquisition Section</title>
+</head>
+<style>
+    .hide{
+        display:none;
+    }
+</style>
+<body>
+    <div class="row">
+        <p>ADC control</p>
+        <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+            <p id="ADC_state">No connection</p>
+            <button class="btn btn-info" id="ADC_reboot_button">Reboot</button>
+        </div>
+        <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+            <label for="next_shot_number">Next shot №:</label><output id="next_shot_number"></output>
+
+            <label for="is_plasma">Is plasma?</label><input type="checkbox" id="is_plasma" checked>
+        </div>
+        <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+            <button class="btn btn-success" id="ADC_arm_button">Arm</button>
+            <button class="btn btn-danger" id="ADC_disarm_button">Disarm</button>
+        </div>
+    </div>
+    <hr>
+    <div id="diag_row">
+        <p>Diagnostics control</p>
+        <label for="config_select">Configuration:</label><select id="config_select" class="configs"></select>
+        <label for="spectral_select">Spectral calibr.:</label><select id="spectral_select" class="sp_calibrations"></select>
+        <label for="abs_select">Abs. calibr.:</label><select id="abs_select" class="abs_calibrations"></select>
+    </div>
+    <hr>
+    <div class="row">
+        <p>SlowADC control</p>
+        <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+            <p id="slowADC_state">No connection</p>
+            <button class="btn btn-info" id="slowADC_reboot_button">Reboot</button>
+        </div>
+        <div class="col-xs-4 col-sm-4 col-md-4 col-lg-4">
+            <button class="btn btn-success" id="slowADC_arm_button">Arm</button>
+            <button class="btn btn-danger" id="slowADC_disarm_button">Disarm</button>
+        </div>
+    </div>
+    <hr>
+    <div class="container-fluid">
+        <p>Electron density feedback control</p>
+        <div class="row">
+            <label for="gas_select">N<sub>e</sub> program:</label><select id="gas_select" class="gas_programs"></select>
+            <button class="btn btn-danger" id="gas_edit">Edit</button>
+            <label for="gas_coeff">Volts/(10<sup>-19</sup> m<sup>-3</sup>)</label><input id="gas_coeff" type="number" value="0.01" min="0.0" step="0.001" disabled>
+            <label for="program_name"> New name:</label><input id="program_name" type="text" disabled>
+            <button class="btn btn-success" id="gas_save" disabled>save</button>
+        </div>
+        <div class="row">
+            <div class="col-xs-8 col-sm-8 col-md-8 col-lg-8">
+                <div id="acq_gas_evo_chart" style="width:100%; height:400px;" gas evo></div>
+            </div>
+        </div>
+    </div>
+</body>
+
+<script>
+    function Main () {
+        this.m_status_timer = null;
+        this.state = null;
+        this.aqc_configs = null;
+
+        this.xSnapDistance = 3;
+        this.ySnapDistance = 3;
+
+        this.xValue;
+        this.yValue;
+
+        this.mouseDown = false;
+        this.selected = null;
+        this.timerId = null;
+
+        this.aqc_gas_evo_chart = new CanvasJS.Chart("acq_gas_evo_chart", {
+            title: {
+                text: 'Electron density program',
+                fontSize: 14,
+                fontFamily: 'arial'
+            },
+            axisY: {
+                includeZero: true,
+                title: 'Electron density, m⁻³',
+                titleFontSize: 12,
+                labelFormatter: function ( e ) {
+                    return e.value.toExponential(1);
+                },
+                minimum: 0,
+                crosshair: {
+                    enabled: true,
+                    labelFormatter: function(e) {
+                        return e.value.toExponential(1);
+                    }
+                },
+                fontFamily: 'arial'
+            },
+            axisX: {
+                title: "Time, ms",
+                titleFontSize: 12,
+                minimum: 110,
+                maximum: 260,
+                crosshair: {
+                    enabled: true,
+                    labelFormatter: function(e) {
+                        return e.value.toFixed(1);
+                    }
+                },
+                fontFamily: 'arial'
+            },
+            toolTip: {
+                enabled: false
+            },
+            legend: {
+                cursor: "pointer",
+                itemmouseover: function(e) {
+                    if(e.dataSeries.visible) {
+                        this.aqc_gas_evo_chart.options.data[e.dataSeriesIndex].lineThickness = this.m_defaults.line_thickness_high;
+                        this.aqc_gas_evo_chart.options.data[e.dataSeriesIndex + 1].lineThickness = this.m_defaults.line_thickness_high;
+                        this.aqc_gas_evo_chart.render();
+                    }
+                }.bind(this),
+                itemmouseout: function(e) {
+                    if(e.dataSeries.visible) {
+                        this.aqc_gas_evo_chart.options.data[e.dataSeriesIndex].lineThickness = this.m_defaults.line_thickness_base;
+                        this.aqc_gas_evo_chart.options.data[e.dataSeriesIndex + 1].lineThickness = this.m_defaults.line_thickness_base;
+                        this.aqc_gas_evo_chart.render();
+                    }
+                }.bind(this),
+                itemclick: function (e) {
+                    e.dataSeries.visible = !(typeof (e.dataSeries.visible) === "undefined" || e.dataSeries.visible);
+                    this.aqc_gas_evo_chart.render();
+                }.bind(this)
+            },
+            data: [{
+                type: "line",
+                color:'#181818',
+                visible: true,
+                showInLegend: true,
+                name: 'Requested gas program',
+                dataPoints: []
+            }]
+        });
+        this.aqc_gas_evo_chart.render();
+
+        this.selectors = {
+            ADC_state: $('#ADC_state'),
+            arm_button: $('#ADC_arm_button'),
+            disarm_button: $('#ADC_disarm_button'),
+            next_shotn: $('#next_shot_number'),
+            isPlasma_checkbox: $('#is_plasma')[0]
+        };
+
+        this.setTimer = function(){
+            let delay = 500;
+            this.m_status_timer = setTimeout(function request() {
+                this.ADCState();
+                //if (ошибка запроса из-за перегрузки сервера) {
+                // увеличить интервал для следующего запроса
+                //  delay *= 2;
+                //}
+                this.m_status_timer = setTimeout(request.bind(this), delay);
+                this.DisplayState();
+            }.bind(this), delay);
+        }
+
+        this.Request = function (req, callback) {
+            $.post('/api', JSON.stringify(req), callback, 'json');
+        };
+
+        this.DisplayState = function(){
+            if(this.state.CAENS.boardCount === 0 || this.state.CAENS.boardCount !== this.state.CAENS.connectedCount){
+                this.selectors.ADC_state.css('background-color','red');
+                this.selectors.ADC_state.html('Connected ' + this.state.CAENS.connectedCount + ' of ' + this.state.CAENS.boardCount + ' links. ' + ((this.state.unix - 1e-3 * Date.now())).toFixed(0) + ' (s)');
+
+                this.selectors.arm_button.prop("disabled", true);
+                this.selectors.disarm_button.prop( "disabled", true);
+            }else{
+                if(this.state.CAENS.armed){
+                    this.selectors.arm_button.prop("disabled", true);
+                    this.selectors.disarm_button.prop( "disabled", false);
+                    if(this.state.CAENS.recordedPulses === 0){
+                        this.selectors.ADC_state.css('background-color','green');
+                        this.selectors.ADC_state.html('Armed ' + ((this.state.unix - 1e-3 * Date.now())).toFixed(0) + ' (s)');
+
+                    }else{
+                        this.selectors.ADC_state.css('background-color','yellow');
+                        this.selectors.ADC_state.html('Armed, recorded ' + this.state.CAENS.recordedPulses + ' pulses. ' + ((this.state.unix - 1e-3 * Date.now())).toFixed(0) + ' (s)');
+                    }
+                }else{
+                    if(this.state.CAENS.saving){
+                        this.selectors.ADC_state.css('background-color','blue');
+                        this.selectors.ADC_state.html('Writing files... ' + ((this.state.unix - 1e-3 * Date.now())).toFixed(0) + ' (s)');
+                        this.selectors.arm_button.prop("disabled", true);
+                        this.selectors.disarm_button.prop( "disabled", true);
+                    }else if(this.state.CAENS.saved){
+                        this.selectors.ADC_state.css('background-color', 'white');
+                        this.selectors.ADC_state.html('Ready ' + ((this.state.unix - 1e-3 * Date.now())).toFixed(0) + ' (s)');
+                        this.selectors.arm_button.prop("disabled", false);
+                        this.selectors.disarm_button.prop("disabled", true);
+                    }else{
+                        this.selectors.ADC_state.css('background-color', 'red');
+                        this.selectors.ADC_state.html('WTF??? ' + ((this.state.unix - 1e-3 * Date.now())).toFixed(0) + ' (s)');
+                        this.selectors.arm_button.prop("disabled", true);
+                        this.selectors.disarm_button.prop("disabled", false);
+                    }
+                }
+            }
+            if(this.selectors.isPlasma_checkbox.checked){
+                this.selectors.next_shotn.val(this.state.plasma_shotn);
+            }else{
+                this.selectors.next_shotn.val(this.state.debug_shotn);
+            }
+        };
+
+        //ADC
+        this.ADCReboot = function(){
+            this.Request(
+                {
+                    subsystem: 'ADC',
+                    reqtype: 'reboot'
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }
+                }
+            );
+        }.bind(this);
+
+        this.ADCArm = function(){
+            this.Request(
+                {
+                    subsystem: 'ADC',
+                    reqtype: 'arm',
+                    is_plasma: $('#is_plasma')[0].checked,
+                    header: {
+                        config: $('#config_select').val(),
+                        abs_cal: $('#abs_select').val(),
+                        spectral_cal: $('#spectral_select').val(),
+                        ne_program: $('#gas_select').val()
+                    }
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }
+                }
+            );
+        }.bind(this);
+
+        this.ADCDisarm = function(){
+            this.Request(
+                {
+                    subsystem: 'ADC',
+                    reqtype: 'disarm'
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }
+                }
+            );
+        }.bind(this);
+
+        this.ADCState = function(){
+            this.Request(
+                {
+                    subsystem: 'ADC',
+                    reqtype: 'state'
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }else{
+                        this.state = resp;
+                    }
+                }.bind(this)
+            );
+        };
+
+        //SlowADC
+        this.SlowADCReboot = function(){
+            this.Request(
+                {
+                    subsystem: 'slowADC',
+                    reqtype: 'reboot'
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }
+                }
+            );
+        }.bind(this);
+
+        this.ConnectControls = function () {
+            $('#ADC_reboot_button').on('click', this, this.ADCReboot);
+            $('#ADC_arm_button').on('click', this, this.ADCArm);
+            $('#ADC_disarm_button').on('click', this, this.ADCDisarm);
+
+            $('#slowADC_reboot_button').on('click', this, this.SlowADCReboot);
+
+            $('#gas_select').on('change', this, this.DrawProg.bind(this));
+            $('#gas_edit').on('click', this, this.EnableEdit);
+            $('#gas_save').on('click', this, this.DisableEdit);
+        };
+
+        this.GetConfigs = function(){
+            this.Request(
+                {
+                    subsystem: 'ADC',
+                    reqtype: 'configs'
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }else{
+                        this.aqc_configs = resp['data'];
+                        this.UpdateConfigSelects();
+                    }
+                }.bind(this)
+            );
+        }.bind(this);
+
+        this.UpdateConfigSelects = function() {
+            let options = [];
+
+            options = [];
+            this.aqc_configs.configs.forEach(entry => options.push("<option>" + entry + "</option>"));
+            $('.configs').html(options.reverse());
+
+            options = [];
+            this.aqc_configs.abs.forEach(entry => options.push("<option>" + entry + "</option>"));
+            $('.abs_calibrations').html(options.reverse());
+
+            options = [];
+            this.aqc_configs.spectral.forEach(entry => options.push("<option>" + entry + "</option>"));
+            $('.sp_calibrations').html(options.reverse());
+
+            options = [];
+            this.aqc_configs.gas.forEach(entry => options.push("<option>" + entry + "</option>"));
+            $('.gas_programs').html(options.reverse());
+            this.DrawProg();
+        };
+
+        this.DrawProg = function(){
+            this.Request(
+                {
+                    subsystem: 'ADC',
+                    reqtype: 'getGas',
+                    name: $('#gas_select').val()
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }
+                    console.log(resp.data);
+                    this.aqc_gas_evo_chart.options.data[0].dataPoints = [];
+                    for(let time_ind = 0; time_ind < resp.data.desired_ne.length; time_ind++) {
+                        this.aqc_gas_evo_chart.options.data[0].dataPoints.push(
+                            {
+                                x: resp.data.desired_ne[time_ind].time,
+                                y: resp.data.desired_ne[time_ind].ne
+                            }
+                        );
+                    }
+                    this.aqc_gas_evo_chart.render();
+                }.bind(this)
+            );
+        }.bind(this);
+
+        this.getPosition = function(e) {
+            let parentOffset = $("#acq_gas_evo_chart > .canvasjs-chart-container").offset();
+            let relX = e.pageX - parentOffset.left;
+            let relY = e.pageY - parentOffset.top;
+            this.xValue = Math.round(this.aqc_gas_evo_chart.axisX[0].convertPixelToValue(relX));
+            this.yValue = Math.round(this.aqc_gas_evo_chart.axisY[0].convertPixelToValue(relY));
+        }
+
+        this.searchDataPoint = function() {
+            let dps = this.aqc_gas_evo_chart.data[0].dataPoints;
+            for(let i = 0; i < dps.length; i++ ) {
+                if((this.xValue >= dps[i].x - this.xSnapDistance && this.xValue <= dps[i].x + this.xSnapDistance) &&
+                    (this.yValue >= dps[i].y - this.ySnapDistance && this.yValue <= dps[i].y + this.ySnapDistance) ) {
+                    if(this.mouseDown) {
+                        if(i === 0 || i === dps.length - 1){
+                            this.selected = null;
+                        }else{
+                            this.selected = i;
+                        }
+                    }
+                    break;
+                } else {
+                    this.selected = null;
+                }
+            }
+        }.bind(this);
+
+        this.gasChartMousedown = function(e) {
+            this.mouseDown = true;
+            this.getPosition(e);
+            this.searchDataPoint();
+        }.bind(this);
+
+        this.gasChartMousemove = function(e) {
+            this.getPosition(e);
+            if(this.mouseDown) {
+                clearTimeout(this.timerId);
+                this.timerId = setTimeout(function(){
+                    if(this.selected != null) {
+                        //limit x movement
+                        if(this.aqc_gas_evo_chart.data[0].dataPoints[this.selected - 1].x <= this.xValue &&
+                            this.aqc_gas_evo_chart.data[0].dataPoints[this.selected + 1].x >= this.xValue){
+                            this.aqc_gas_evo_chart.data[0].dataPoints[this.selected].x = this.xValue;
+                        }
+
+                        this.aqc_gas_evo_chart.data[0].dataPoints[this.selected].y = Math.max(0, this.yValue);
+                        this.aqc_gas_evo_chart.render();
+                    }
+                }.bind(this), 0);
+            }else {
+                this.searchDataPoint();
+            }
+        }.bind(this);
+
+        this.gasChartMouseup = function(e) {
+            if(this.selected != null) {
+                if(this.aqc_gas_evo_chart.data[0].dataPoints[this.selected - 1].x <= this.xValue &&
+                    this.aqc_gas_evo_chart.data[0].dataPoints[this.selected + 1].x >= this.xValue){
+                    this.aqc_gas_evo_chart.data[0].dataPoints[this.selected].x = this.xValue;
+                }
+                this.aqc_gas_evo_chart.data[0].dataPoints[this.selected].y = Math.max(0, this.yValue);
+                this.aqc_gas_evo_chart.render();
+                this.mouseDown = false;
+            }
+        }.bind(this);
+
+        this.EnableEdit = function(){
+            this.xSnapDistance = 10;
+            this.ySnapDistance = 1e18;
+
+            $("#acq_gas_evo_chart > .canvasjs-chart-container").on('mousedown', this, this.gasChartMousedown);
+            $("#acq_gas_evo_chart > .canvasjs-chart-container").on('mousemove', this, this.gasChartMousemove);
+            $("#acq_gas_evo_chart > .canvasjs-chart-container").on('mouseup', this, this.gasChartMouseup);
+
+            $("#gas_coeff").prop('disabled', false);
+            $("#program_name").prop('disabled', false);
+            $("#gas_edit").prop('disabled', true);
+            $("#gas_save").prop('disabled', false);
+        }.bind(this);
+
+        this.DisableEdit = function(){
+            $("#acq_gas_evo_chart > .canvasjs-chart-container").off('mousedown', this.gasChartMousedown);
+            $("#acq_gas_evo_chart > .canvasjs-chart-container").off('mousemove', this.gasChartMousemove);
+            $("#acq_gas_evo_chart > .canvasjs-chart-container").off('mouseup', this, this.gasChartMouseup);
+
+            $("#gas_coeff").prop('disabled', true);
+            $("#program_name").prop('disabled', true);
+            $("#gas_edit").prop('disabled', false);
+            $("#gas_save").prop('disabled', true);
+
+            this.SaveGasProgram();
+        }.bind(this);
+
+        this.SaveGasProgram = function(){
+            let prog = {
+                type: 'gas',
+                valve_coeff: parseFloat($('#gas_coeff').val()) * 1e-19,
+                version: 0,
+                desired_ne: []
+            };
+
+            let dps = this.aqc_gas_evo_chart.data[0].dataPoints;
+            for(let i = 0; i < dps.length; i++ ) {
+                prog.desired_ne.push({
+                    time: dps[i].x,
+                    ne: dps[i].y
+                });
+            }
+
+            this.Request(
+                {
+                    subsystem: 'ADC',
+                    reqtype: 'saveGas',
+                    name: $('#program_name').val(),
+                    prog: prog
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }
+                    this.GetConfigs();
+                }.bind(this)
+            );
+        };
+
+        this.ConnectControls();
+        this.GetConfigs();
+        this.setTimer();
+    }
+
+    $(document).ready(function () {
+            let viewer = new Main();
+        })
+</script>
+</html>
