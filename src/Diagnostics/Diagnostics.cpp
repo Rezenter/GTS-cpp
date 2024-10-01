@@ -1,7 +1,8 @@
 //
-// Created by nz on 22.08.2023.
+// Created by user on 24.09.2024.
 //
-#include "RequestHandler.h"
+
+#include "Diagnostics.h"
 #include <chrono>
 
 #include "json.hpp"
@@ -9,35 +10,24 @@
 
 using Json = nlohmann::json;
 
-std::basic_string<char> handleRequest(char* request_str){
-    Json payload;
-    try{
-        payload = Json::parse(request_str);
-    }catch(Json::parse_error& err){
-        return to_string(Json({
-                                      {"ok", false},
-                                      {"err", "request is not a valid JSON"}
-                              }));
-    }
-
+Json Diagnostics::handleRequest(Json& payload){
     Json resp;
     if(payload.contains("subsystem")){
         if(payload.at("subsystem") == "mirror"){
 
             //resp = mirror.requestHandler(payload);
-        }if(payload.at("subsystem") == "diag"){
-            DB wtf;
+        }else if(payload.at("subsystem") == "diag"){
             resp = {
-                    {"ok", true},
-                    {"val", wtf.pathConfig}
+                    {"ok", true}
             };
+        }else if(payload.at("subsystem") == "laser330"){
+            resp = laser.handleRequest(payload);
         }else{
             resp = {
                     {"ok", false},
                     {"err", "requested subsystem not found"}
             };
         }
-
 
     }else{
         resp = {
@@ -47,5 +37,5 @@ std::basic_string<char> handleRequest(char* request_str){
     }
     resp["unix"] = std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
-    return to_string(resp);
+    return resp;
 };
