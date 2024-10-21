@@ -1,9 +1,9 @@
 //
-// Created by user on 24.09.2024.
+// Created by user on 01.10.2024.
 //
 
-#ifndef GTS_CORE_LASER330_H
-#define GTS_CORE_LASER330_H
+#ifndef GTS_CORE_COOLANT_H
+#define GTS_CORE_COOLANT_H
 
 #include "mongoose.h"
 #include "string"
@@ -14,10 +14,12 @@
 
 using Json = nlohmann::json;
 
-class Laser330 : public Stoppable{
+
+class Coolant : public Stoppable{
 private:
     struct mg_mgr* mgr = nullptr;
-    inline static const char *address = "tcp://192.168.10.44:4001";  // Lase moxa ipv4 address
+    inline static const char *address = "tcp://192.168.10.47:502";  // Laser cooler ipv4 address
+    inline static const char *request = "1469000000060204001e0002"; //1469 = random 2 bytes, hex representation
     static const size_t MAX_HISTORY_SIZE = 10000;
     bool connected = false;
     mg_timer* watchdog;
@@ -31,7 +33,6 @@ private:
         uint16_t delayMO;
         uint16_t delayAmp;
         uint8_t state;
-
     };
     std::deque<State> states;
 
@@ -63,11 +64,9 @@ private:
     bool payload() override;
     void beforePayload() override;
     void afterPayload() override;
-    long long int lastTimestamp_ms;
-    Json setState(Json& req);
 
 public:
-    ~Laser330() override;
+    ~Coolant() override;
 
     Json handleRequest(Json& request);
     void setMgr(mg_mgr* mgr){
@@ -75,9 +74,7 @@ public:
     };
 
     Json status();
-    void start();
-    void stop();
 };
 
 
-#endif //GTS_CORE_LASER330_H
+#endif //GTS_CORE_COOLANT_H

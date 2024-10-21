@@ -1,45 +1,43 @@
 //
-// Created by user on 24.09.2024.
+// Created by user on 01.10.2024.
 //
 
-#include "Laser330.h"
+#include "Coolant.h"
 #include "iostream"
 
 using namespace std::chrono_literals;
 
-Json Laser330::handleRequest(Json& request){
+Json Coolant::handleRequest(Json& request){
     Json resp;
     if(request.contains("reqtype")){
         //MG_INFO(("REQUEST___________________"));
         if(request.at("reqtype") == "connect"){
             resp = {
                     {"ok", true}
-                };
+            };
             this->connect();
         }else if(request.at("reqtype") == "status"){
             resp = this->status();
-        }else if(request.at("reqtype") == "setState"){
-            resp = this->setState(request);
         }else{
             resp = {
                     {"ok", false},
                     {"err", "reqtype not found"}
-                };
+            };
         }
     }else{
         resp = {
                 {"ok", false},
                 {"err", "request has no 'reqtype'"}
-            };
+        };
     }
     return resp;
 }
 
-void Laser330::connect() {
+void Coolant::connect() {
     if(this->connected){
         return;
     }
-    this->watchdog = mg_timer_add(this->mgr, 300, MG_TIMER_REPEAT | MG_TIMER_RUN_NOW, Laser330::reconnectSocket, this);
+    this->watchdog = mg_timer_add(this->mgr, 300, MG_TIMER_REPEAT | MG_TIMER_RUN_NOW, Coolant::reconnectSocket, this);
     //run();
     /*
     queue.emplace(0,
@@ -50,9 +48,9 @@ void Laser330::connect() {
     */
 }
 
-void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
+void Coolant::cfn(struct mg_connection *c, int ev, void *ev_data) {
     //MG_INFO(("CFN"));
-    auto* th = static_cast<Laser330 *>(c->fn_data);
+    auto* th = static_cast<Coolant *>(c->fn_data);
     if (ev == MG_EV_OPEN) {
         //MG_INFO(("CLIENT has been initialized"));
     } else if (ev == MG_EV_CONNECT) {
@@ -175,7 +173,7 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
                                                     delayMO,
                                                     delayAmp,
                                                     state);
-                            if(th->states.size() > Laser330::MAX_HISTORY_SIZE){
+                            if(th->states.size() > Coolant::MAX_HISTORY_SIZE){
                                 th->states.pop_front();
                             }
 
@@ -265,16 +263,16 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
     }
 }
 
-void Laser330::reconnectSocket(void *arg) {
-    auto* th = (Laser330*)arg;
+void Coolant::reconnectSocket(void *arg) {
+    auto* th = (Coolant*)arg;
     if (th->curr_c == nullptr) {
         MG_INFO(("reconnect"));
-        th->curr_c = mg_connect(th->mgr, th->address, Laser330::cfn, th);
+        th->curr_c = mg_connect(th->mgr, th->address, Coolant::cfn, th);
         MG_INFO(("CLIENT %s", th->curr_c ? "connecting" : "failed"));
     }
 }
 
-bool Laser330::payload(){
+bool Coolant::payload(){
     uint8_t count = 0;
     while(true){
         if(count == 20){
@@ -301,16 +299,16 @@ bool Laser330::payload(){
     return false;
 }
 
-void Laser330::beforePayload() {
+void Coolant::beforePayload() {
     Stoppable::beforePayload();
 }
 
-void Laser330::afterPayload() {
+void Coolant::afterPayload() {
     Stoppable::afterPayload();
 }
 
-Laser330::~Laser330() {
-    std::cout << "~Laser330" << std::endl;
+Coolant::~Coolant() {
+    std::cout << "~Coolant" << std::endl;
     while(!this->queue.empty()){
         this->queue.pop();
     }
@@ -319,16 +317,16 @@ Laser330::~Laser330() {
     this->associatedThread.join();
     std::cout << "all joined" << std::endl;
 
-    //mg_timer_add(this->mgr, 300, MG_TIMER_REPEAT | MG_TIMER_RUN_NOW, Laser330::reconnectSocket, this);
+    //mg_timer_add(this->mgr, 300, MG_TIMER_REPEAT | MG_TIMER_RUN_NOW, Coolant::reconnectSocket, this);
     mg_timer_free(&this->mgr->timers, this->watchdog);
 }
 
-Json Laser330::status() {
+Json Coolant::status() {
     if(this->states.empty()){
         return Json({
-                {"ok", false},
-                {"err", "laser status is unknown"}
-        });
+                            {"ok", false},
+                            {"err", "laser status is unknown"}
+                    });
     }
     Json resp = R"(
         {
@@ -363,64 +361,4 @@ Json Laser330::status() {
     resp["delayMO"] = last.delayMO;
     resp["delayAmp"] = last.delayAmp;
     return resp;
-}
-
-Json Laser330::setState(Json &req) {
-    if(req.contains("target")) {
-        uint8_t tgt = req.at("target");
-        uint8_t curr = states.back().state;
-        if(tgt == curr){
-            return Json({
-                                {"ok", true}
-                        });
-        }
-        if(tgt == 0){
-            queue.emplace(100,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
-                          "S0004 37\n"
-            );
-        }else if(tgt == 1){
-            queue.emplace(200,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
-                          "S0012 36\n"
-            );
-        }else if(tgt == 2){
-            queue.emplace(200,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
-                          "S100A 45\n"
-            );
-        }else if(tgt == 3){
-            queue.emplace(200,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
-                          "S200A 46\n"
-            );
-        }else{
-            return Json({
-                                {"ok", false},
-                                {"err", "wrong 'target'"}
-                        });
-        }
-        return Json({
-                            {"ok", true}
-                    });
-    }else{
-        return Json({
-                            {"ok", false},
-                            {"err", "setState request has no 'target'"}
-                    });
-    }
-}
-
-void Laser330::start() {
-    queue.emplace(200,
-                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
-                  "S200A 46\n"
-    );
-}
-
-void Laser330::stop() {
-    queue.emplace(200,
-                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
-                  "S0012 36\n"
-    );
 }

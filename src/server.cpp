@@ -175,12 +175,16 @@ int main() {
     struct mg_mgr mgr;
     diag.setMgr(&mgr);
 
+
     mg_mgr_init(&mgr);                                      // Init manager
     mg_http_listen(&mgr, "http://0.0.0.0:99", fn, NULL);  // Setup listener
+
+
+    mg_listen(&mgr, "udp://0.0.0.0:8888", diag.fn, &diag);
     mg_wakeup_init(&mgr);  // Initialise wakeup socket pair
     std::cout << "Server alive" << std::endl;
     while(s_signo == 0) {
-        mg_mgr_poll(&mgr, 50);
+        mg_mgr_poll(&mgr, 1);
     }
     std::cout << "Stop poll" << std::endl;
     for(auto iter = deque.begin(); iter != deque.end();){

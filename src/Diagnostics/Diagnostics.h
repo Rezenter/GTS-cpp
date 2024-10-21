@@ -9,6 +9,7 @@
 #include "string"
 
 #include "laser330/Laser330.h"
+//#include "laser330/Coolant.h" //move to Laser
 
 class Diagnostics {
 
@@ -16,6 +17,7 @@ private:
     mg_mgr* mgr;
     Laser330 laser;
 public:
+    static void fn(struct mg_connection *c, int ev, void *ev_data);
     void setMgr(mg_mgr *mgr){
         this->mgr = mgr;
         laser.setMgr(mgr);
