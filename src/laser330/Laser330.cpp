@@ -10,13 +10,7 @@ using namespace std::chrono_literals;
 Json Laser330::handleRequest(Json& request){
     Json resp;
     if(request.contains("reqtype")){
-        //MG_INFO(("REQUEST___________________"));
-        if(request.at("reqtype") == "connect"){
-            resp = {
-                    {"ok", true}
-                };
-            this->connect();
-        }else if(request.at("reqtype") == "status"){
+        if(request.at("reqtype") == "status"){
             resp = this->status();
         }else if(request.at("reqtype") == "setState"){
             resp = this->setState(request);
@@ -33,21 +27,6 @@ Json Laser330::handleRequest(Json& request){
             };
     }
     return resp;
-}
-
-void Laser330::connect() {
-    if(this->connected){
-        return;
-    }
-    this->watchdog = mg_timer_add(this->mgr, 300, MG_TIMER_REPEAT | MG_TIMER_RUN_NOW, Laser330::reconnectSocket, this);
-    //run();
-    /*
-    queue.emplace(0,
-                        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 500,
-                        "J0700 31\n",
-                        ""
-                        );
-    */
 }
 
 void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
@@ -240,9 +219,18 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
             //MG_INFO(("TCP poll, waiting for response"));
 
             if(th->queue.top().bestBefore < std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()){
-                MG_INFO(("TCP poll, outdated request. BAD!!! response will crash"));
-                std::cout << th->queue.top().request << " queue: " << th->queue.size() << std::endl;
-                //th->queue.pop();
+                MG_INFO(("LAG"));
+                //int count = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                if(th->queue.top().request.starts_with('S')){
+                    th->queue.emplace(220,
+                                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 200,
+                                  th->queue.top().request
+                    );
+                    MG_INFO(("command renewed"));
+                }
+                //MG_INFO(("TCP poll, outdated request. BAD!!! response will crash"));
+                //std::cout << th->queue.top().request << " queue: " << th->queue.size() << std::endl;
+                th->queue.pop();
             }
             return;
         }
@@ -256,6 +244,8 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
 
         //if poll, check queue
         //timeouts
+    }else if(ev == MG_EV_ACCEPT || ev == MG_EV_RESOLVE) {
+        //TCP accepted
     }else if(ev != MG_EV_WRITE){
         std::cout << "Unhandled event by laser: " << ev << " connection ID: " << c->id << ' ';
         for(int i = 0; i < 4; i++){
@@ -269,7 +259,7 @@ void Laser330::reconnectSocket(void *arg) {
     auto* th = (Laser330*)arg;
     if (th->curr_c == nullptr) {
         MG_INFO(("reconnect"));
-        th->curr_c = mg_connect(th->mgr, th->address, Laser330::cfn, th);
+        th->curr_c = mg_connect(th->mgr, Laser330::address, Laser330::cfn, th);
         MG_INFO(("CLIENT %s", th->curr_c ? "connecting" : "failed"));
     }
 }
@@ -279,34 +269,26 @@ bool Laser330::payload(){
     while(true){
         if(count == 20){
             queue.emplace(0,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1000,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                           "J0600 30\n"
             );
             count = 0;
         }else if(count == 10){
             queue.emplace(0,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1000,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                           "J0500 2F\n"
             );
             count++;
         }else{
             queue.emplace(1,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1000,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                           "J0700 31\n"
             );
             count++;
         }
-        std::this_thread::sleep_for(500ms);
+        std::this_thread::sleep_for(200ms);
     }
     return false;
-}
-
-void Laser330::beforePayload() {
-    Stoppable::beforePayload();
-}
-
-void Laser330::afterPayload() {
-    Stoppable::afterPayload();
 }
 
 Laser330::~Laser330() {
@@ -376,22 +358,22 @@ Json Laser330::setState(Json &req) {
         }
         if(tgt == 0){
             queue.emplace(100,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                           "S0004 37\n"
             );
         }else if(tgt == 1){
             queue.emplace(200,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                           "S0012 36\n"
             );
         }else if(tgt == 2){
             queue.emplace(200,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                           "S100A 45\n"
             );
         }else if(tgt == 3){
             queue.emplace(200,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
+                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                           "S200A 46\n"
             );
         }else{
@@ -413,14 +395,14 @@ Json Laser330::setState(Json &req) {
 
 void Laser330::start() {
     queue.emplace(200,
-                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
+                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                   "S200A 46\n"
     );
 }
 
 void Laser330::stop() {
     queue.emplace(200,
-                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 1500,
+                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                   "S0012 36\n"
     );
 }

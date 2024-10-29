@@ -22,34 +22,35 @@ protected:
 public:
     std::thread associatedThread;
     virtual ~Stoppable(){
-        requestStop();
-        associatedThread.join();
+        this->requestStop();
+        this->associatedThread.join();
     };
 
     void requestStop(){
-        mutex.lock();
-        stop = true;
-        mutex.unlock();
+        this->mutex.lock();
+        this->stop = true;
+        this->mutex.unlock();
     };
 
     void run(){
-        mutex.lock();
-        stop = false;
-        mutex.unlock();
+        this->mutex.lock();
+        this->stop = false;
+        this->mutex.unlock();
 
-        beforePayload();
+        this->beforePayload();
         while(true){
-            mutex.lock();
-            if(stop){
-                mutex.unlock();
+            this->mutex.lock();
+            if(this->stop){
+                this->mutex.unlock();
                 break;
-            }
-            mutex.unlock();
-            if(payload()){
-                break;
+            }else {
+                this->mutex.unlock();
+                if (this->payload()) {
+                    break;
+                }
             }
         }
-        afterPayload();
+        this->afterPayload();
     };
 };
 

@@ -17,7 +17,7 @@ using Json = nlohmann::json;
 class Laser330 : public Stoppable{
 private:
     struct mg_mgr* mgr = nullptr;
-    inline static const char *address = "tcp://192.168.10.44:4001";  // Lase moxa ipv4 address
+    inline static const char *address = "udp://192.168.10.44:4001";  // Laser moxa ipv4 address
     static const size_t MAX_HISTORY_SIZE = 10000;
     bool connected = false;
     mg_timer* watchdog;
@@ -55,23 +55,22 @@ private:
     };
     std::priority_queue<Request> queue;
 
-    void connect();
     static void reconnectSocket(void *arg);
-    static void cfn(struct mg_connection *c, int ev, void *ev_data);
+
 
     //stoppable:
     bool payload() override;
-    void beforePayload() override;
-    void afterPayload() override;
     long long int lastTimestamp_ms;
     Json setState(Json& req);
 
 public:
+    static void cfn(struct mg_connection *c, int ev, void *ev_data);
     ~Laser330() override;
 
     Json handleRequest(Json& request);
     void setMgr(mg_mgr* mgr){
         this->mgr = mgr;
+        this->watchdog = mg_timer_add(this->mgr, 300, MG_TIMER_REPEAT | MG_TIMER_RUN_NOW, Laser330::reconnectSocket, this);
     };
 
     Json status();

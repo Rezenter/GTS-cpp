@@ -12,7 +12,8 @@
 <body>
     <div class="row">
         <p>Select config</p>
-
+        <label for="cpp_config_select">Configuration:</label><select id="cpp_config_select" class="configs"></select>
+        <button class="btn btn-info" id="load_cpp_config_button">Load</button>
     </div>
     <hr>
     <div class="row">
@@ -34,7 +35,7 @@
 
 
         this.ConnectControls = function () {
-            //$('#ADC_reboot_button').on('click', this, this.ADCReboot);
+            $('#load_cpp_config_button').on('click', this, this.LoadConfig);
         };
 
         this.GetConfigs = function(){
@@ -48,9 +49,26 @@
                         console.log(resp);
                         alert(resp.err);
                     }else{
+                        this.aqc_configs = resp;
                         this.UpdateConfigSelects();
                     }
                 }.bind(this)
+            );
+        }.bind(this);
+
+        this.LoadConfig = function(){
+            this.Request(
+                {
+                    subsystem: 'diag',
+                    reqtype: 'load_config',
+                    filename: $('#cpp_config_select').val()
+                }
+                , function (resp) {
+                    if(!resp.ok){
+                        console.log(resp);
+                        alert(resp.err);
+                    }
+                }
             );
         }.bind(this);
 
@@ -58,7 +76,7 @@
             let options = [];
 
             options = [];
-            this.aqc_configs.configs.forEach(entry => options.push("<option>" + entry + "</option>"));
+            this.aqc_configs.files.forEach(entry => options.push("<option>" + entry + "</option>"));
             $('.configs').html(options.reverse());
         };
 

@@ -1,15 +1,14 @@
 #include "mongoose.h"
-#include <cstring>
-#include <string>
+
+
+
 #include "src/Diagnostics/Diagnostics.h"
 #include <csignal>
 #include <thread>
 
 //for affinity
-//#include <windows.h>
 #include <tchar.h>
 #include <psapi.h>
-#include <wbemidl.h>
 
 #include "iostream"
 #include <exception>
@@ -173,18 +172,17 @@ int main() {
 
 
     struct mg_mgr mgr;
+    mg_mgr_init(&mgr);                                      // Init manager
     diag.setMgr(&mgr);
 
+    mg_http_listen(&mgr, "http://0.0.0.0:99", fn, NULL);  // api/web
+    mg_listen(&mgr, "udp://0.0.0.0:8888", diag.fn, &diag); //udp start/stop
+    mg_listen(&mgr, "udp://0.0.0.0:4001", Laser330::cfn, &diag.laser); //udp laser
 
-    mg_mgr_init(&mgr);                                      // Init manager
-    mg_http_listen(&mgr, "http://0.0.0.0:99", fn, NULL);  // Setup listener
-
-
-    mg_listen(&mgr, "udp://0.0.0.0:8888", diag.fn, &diag);
     mg_wakeup_init(&mgr);  // Initialise wakeup socket pair
     std::cout << "Server alive" << std::endl;
     while(s_signo == 0) {
-        mg_mgr_poll(&mgr, 1);
+        mg_mgr_poll(&mgr, 0);
     }
     std::cout << "Stop poll" << std::endl;
     for(auto iter = deque.begin(); iter != deque.end();){

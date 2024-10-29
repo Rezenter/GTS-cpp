@@ -4,8 +4,7 @@
 
 #include "Diagnostics.h"
 #include <chrono>
-
-#include "json.hpp"
+#include <fstream>
 
 
 using Json = nlohmann::json;
@@ -14,14 +13,42 @@ Json Diagnostics::handleRequest(Json& payload){
     Json resp;
     if(payload.contains("subsystem")){
         if(payload.at("subsystem") == "mirror"){
-
+            resp = {
+                    {"ok", false},
+                    {"err", "requested subsystem not implemented"}
+            };
             //resp = mirror.requestHandler(payload);
         }else if(payload.at("subsystem") == "diag"){
-            resp = {
-                    {"ok", true}
-            };
+            if(payload.contains("reqtype")){
+                if(payload.at("reqtype") == "get_configs"){
+                    resp = this->getConfigs();
+                }else if(payload.at("reqtype") == "load_config"){
+                    if(payload.contains("filename")) {
+                        resp = this->loadConfig(payload.at("filename"));
+                    }else{
+                        resp = {
+                                {"ok", false},
+                                {"err", "request has no 'filename'"}
+                        };
+                    }
+                }else{
+                    resp = {
+                            {"ok", false},
+                            {"err", "reqtype not found"}
+                    };
+                }
+            }else{
+                resp = {
+                        {"ok", false},
+                        {"err", "request has no 'reqtype'"}
+                };
+            }
         }else if(payload.at("subsystem") == "laser330"){
-            resp = laser.handleRequest(payload);
+            resp = this->laser.handleRequest(payload);
+        }else if(payload.at("subsystem") == "coolant"){
+            resp = this->coolant.handleRequest(payload);
+        }else if(payload.at("subsystem") == "fast"){
+            resp = this->caens.handleRequest(payload);
         }else{
             resp = {
                     {"ok", false},
@@ -68,4 +95,64 @@ void Diagnostics::fn(struct mg_connection *c, int ev, void *ev_data) {
     }else if (ev != MG_EV_POLL){
         MG_INFO(("UDP:8888 unhandled event"));
     }
+}
+
+Json Diagnostics::getConfigs() {
+    if(!Diagnostics::configPath.exists()){
+        return Json({
+                            {"ok", false},
+                            {"err", "hardcoded directory not found: d:\\data\\db\\config_cpp\\"}
+                    });
+    }
+    Json resp({
+                            {"ok", true},
+                            {"files", {}}
+                    });
+    for (auto const& dir_entry : std::filesystem::directory_iterator{Diagnostics::configPath}) {
+        resp["files"].push_back(dir_entry.path().filename());
+        //std::cout << dir_entry.path() << '\n';
+    }
+    return resp;
+}
+
+Json Diagnostics::loadConfig(std::string filename) {
+    std::filesystem::directory_entry configFile {Diagnostics::configPath.path().string() + filename};
+    if(!configFile.exists()){
+        return Json({
+                     {"ok", false},
+                     {"err", "WTF? file not found"},
+                     {"also", configFile.path().string()}
+             });
+    }
+
+    std::ifstream file;
+    file.open(configFile);
+    Json candidate = Json::parse(file);
+    file.close();
+
+    MG_INFO(("WARNING! config file is not checked"));
+    //check config file fields, critical for code execution
+    if(candidate.contains("type")){
+        if(candidate.at("type") != "configuration_cpp"){
+            return {
+                    {"ok", false},
+                    {"err", "configuration file has wrong type: " + to_string(candidate.at("type"))}
+            };
+        }
+    }else{
+        return {
+                {"ok", false},
+                {"err", "configuration file has no field 'type'"}
+        };
+    }
+
+
+    this->config = candidate;
+    Json resp({
+                      {"ok", true},
+                      {"config", this->config}
+              });
+    resp["caens"] = caens.init();
+
+    return resp;
 }
