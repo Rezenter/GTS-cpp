@@ -21,12 +21,14 @@ public:
     explicit AllBoards(Diagnostics* parent): diag{parent} {};
     Json init();
     Json handleRequest(Json& req);
+    ~AllBoards();
 
 private:
-    std::vector<Link> links;
+    std::vector<Link*> links;
     Diagnostics* diag;
     Json status();
     void arm();
+    void disarm();
 
     bool armed = false;
 };

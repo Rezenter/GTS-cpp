@@ -156,3 +156,14 @@ Json Diagnostics::loadConfig(std::string filename) {
 
     return resp;
 }
+
+void Diagnostics::die() {
+    std::cout << "Killing diag" << std::endl;
+    std::cout << "  Killing coolant" << std::endl;
+    //this->coolant;
+    std::cout << "  Killing caens" << std::endl;
+    //this->caens;
+    std::cout << "  Killing laser" << std::endl;
+    //this->laser;
+    std::cout << "diag dead" << std::endl;
+}

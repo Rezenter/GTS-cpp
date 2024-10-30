@@ -36,9 +36,36 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
         //MG_INFO(("CLIENT has been initialized"));
     } else if (ev == MG_EV_CONNECT) {
         th->connected = true;
-        //th->run();
-        th->associatedThread = std::thread([&](){
-            th->run();
+
+        th->worker = std::jthread([&mutex = th->queue_mutex, &queue = th->queue](std::stop_token stoken){
+            uint8_t count = 0;
+            while(!stoken.stop_requested()){
+                //std::cout << "put queue" << std::endl;
+                mutex.lock();
+                if(count == 20){
+                    queue.emplace(0,
+                                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
+                                  "J0600 30\n"
+                    );
+                    count = 0;
+                }else if(count == 10){
+                    queue.emplace(0,
+                                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
+                                  "J0500 2F\n"
+                    );
+                    count++;
+                }else{
+                    queue.emplace(1,
+                                  std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
+                                  "J0700 31\n"
+                    );
+                    count++;
+                }
+                mutex.unlock();
+                std::this_thread::sleep_for(200ms);
+            }
+            //std::cout << "laser worker stopping due to request" << std::endl;
+            return;
         });
 
         //MG_INFO(("CLIENT connected"));
@@ -47,8 +74,9 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
 
         struct mg_iobuf *r = &c->recv;
         //MG_INFO(("CLIENT got data: %.*s", r->len, r->buf));
-
+        th->queue_mutex.lock();
         Request req = th->queue.top();
+        th->queue_mutex.unlock();
         if(r->len == 0){
             MG_INFO(("BAD packet: size == 0"));
         }else if(r->buf[r->len - 1] != '\n'){
@@ -182,26 +210,34 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
             }
         }
 
-        //
-        th->queue.pop();
+        std::lock_guard<std::mutex> guard(th->queue_mutex);
+        if((!th->queue.empty()) && th->queue.top().priority == 255){
+            th->queue.pop();
+        }else{
+            MG_INFO(("attempt to pop empty queue"));
+        }
+
         //req.responce = r->buf;
 
         r->len = 0;  // Tell Mongoose we've consumed data
     } else if (ev == MG_EV_CLOSE) {
         MG_INFO(("CLIENT disconnected"));
         th->connected = false;
-        th->requestStop();
-        th->associatedThread.join();
+        th->worker.request_stop();
+        //MG_INFO(("joining..."));
+        th->worker.join();
         // signal we are done
         th->curr_c=nullptr;
-
+        //MG_INFO(("release queue"));
+        std::lock_guard<std::mutex> guard(th->queue_mutex);
         while(!(th->queue.empty() or th->queue.top().priority < 255)){
-            MG_INFO(("connection closed, drop fired requests"));
+            //MG_INFO(("connection closed, drop fired requests"));
             Request r = th->queue.top();
             th->queue.pop();
             r.priority = 200;
             th->queue.push(r);
         }
+        //MG_INFO(("alive?"));
     } else if (ev == MG_EV_ERROR) {
         MG_INFO(("CLIENT error: %s", (char *) ev_data));
         //MG_INFO(("CLIENT error: "));
@@ -212,6 +248,7 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
             //MG_INFO(("Connection is not ready"));
             return;
         }
+        std::lock_guard<std::mutex> guard(th->queue_mutex);
         if(th->queue.empty()){
             return;
         }
@@ -256,50 +293,27 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 void Laser330::reconnectSocket(void *arg) {
+    //MG_INFO(("reconnect"));
     auto* th = (Laser330*)arg;
     if (th->curr_c == nullptr) {
-        MG_INFO(("reconnect"));
+        MG_INFO(("reconnecting"));
         th->curr_c = mg_connect(th->mgr, Laser330::address, Laser330::cfn, th);
         MG_INFO(("CLIENT %s", th->curr_c ? "connecting" : "failed"));
     }
 }
 
-bool Laser330::payload(){
-    uint8_t count = 0;
-    while(true){
-        if(count == 20){
-            queue.emplace(0,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
-                          "J0600 30\n"
-            );
-            count = 0;
-        }else if(count == 10){
-            queue.emplace(0,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
-                          "J0500 2F\n"
-            );
-            count++;
-        }else{
-            queue.emplace(1,
-                          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
-                          "J0700 31\n"
-            );
-            count++;
-        }
-        std::this_thread::sleep_for(200ms);
-    }
-    return false;
-}
-
 Laser330::~Laser330() {
     std::cout << "~Laser330" << std::endl;
+    this->worker.request_stop();
+    this->worker.join();
+    std::cout << "all joined" << std::endl;
+    std::lock_guard<std::mutex> guard(this->queue_mutex);
     while(!this->queue.empty()){
         this->queue.pop();
     }
     std::cout << "queue cleaned" << std::endl;
-    this->requestStop();
-    this->associatedThread.join();
-    std::cout << "all joined" << std::endl;
+
+
 
     //mg_timer_add(this->mgr, 300, MG_TIMER_REPEAT | MG_TIMER_RUN_NOW, Laser330::reconnectSocket, this);
     mg_timer_free(&this->mgr->timers, this->watchdog);
@@ -356,6 +370,7 @@ Json Laser330::setState(Json &req) {
                                 {"ok", true}
                         });
         }
+        std::lock_guard<std::mutex> guard(this->queue_mutex);
         if(tgt == 0){
             queue.emplace(100,
                           std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
@@ -394,6 +409,7 @@ Json Laser330::setState(Json &req) {
 }
 
 void Laser330::start() {
+    std::lock_guard<std::mutex> guard(this->queue_mutex);
     queue.emplace(200,
                   std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                   "S200A 46\n"
@@ -401,6 +417,7 @@ void Laser330::start() {
 }
 
 void Laser330::stop() {
+    std::lock_guard<std::mutex> guard(this->queue_mutex);
     queue.emplace(200,
                   std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() + 100,
                   "S0012 36\n"

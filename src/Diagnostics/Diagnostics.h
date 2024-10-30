@@ -40,6 +40,7 @@ public:
     };
     Json handleRequest(Json& payload);
     Json config;
+    void die();
 };
 
 

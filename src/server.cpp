@@ -185,6 +185,8 @@ int main() {
         mg_mgr_poll(&mgr, 0);
     }
     std::cout << "Stop poll" << std::endl;
+    diag.die();
+
     for(auto iter = deque.begin(); iter != deque.end();){
         delete iter->thread;
         deque.erase(iter);

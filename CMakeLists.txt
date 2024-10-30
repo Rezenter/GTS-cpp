@@ -29,3 +29,5 @@ add_executable(GTS-core src/server.cpp
         src/Caen/Link.cpp src/Caen/Link.h
         )
 target_link_libraries(GTS-core ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.lib wsock32 ws2_32 )
+
+add_executable(test1 sandbox/test1.cpp)
