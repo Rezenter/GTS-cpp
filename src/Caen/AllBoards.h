@@ -10,7 +10,8 @@
 
 #include "json.hpp"
 
-#include "vector"
+#include <vector>
+#include <thread>
 
 using Json = nlohmann::json;
 
@@ -22,11 +23,12 @@ public:
     Json init();
     Json handleRequest(Json& req);
     ~AllBoards();
+    Json status();
 
 private:
+    std::jthread worker;
     std::vector<Link*> links;
     Diagnostics* diag;
-    Json status();
     void arm();
     void disarm();
 

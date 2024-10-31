@@ -175,7 +175,7 @@ int main() {
     mg_mgr_init(&mgr);                                      // Init manager
     diag.setMgr(&mgr);
 
-    mg_http_listen(&mgr, "http://0.0.0.0:99", fn, NULL);  // api/web
+    mg_http_listen(&mgr, "http://0.0.0.0:80", fn, NULL);  // api/web
     mg_listen(&mgr, "udp://0.0.0.0:8888", diag.fn, &diag); //udp start/stop
     mg_listen(&mgr, "udp://0.0.0.0:4001", Laser330::cfn, &diag.laser); //udp laser
 

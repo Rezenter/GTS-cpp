@@ -109,15 +109,6 @@ Json AllBoards::init() {
         };
     }
     Link::params.pulseCount = diag->config["laser"][0]["pulse_count"];
-
-
-
-
-/*
-    int linkInd;
-    int nodeInd;
-    */
-
     Link::params.linkInd = 0;
     unsigned int boards = 0;
     for(const auto& sett_link: diag->config["fast adc"]["links"]){
@@ -171,7 +162,22 @@ Json AllBoards::init() {
     }
 
     //debug
+    std::cout << "debug arm & software trigger" << std::endl;
+    this->diag->storage.arm(false);
     this->arm();
+    std::cout << "all armed" << std::endl;
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(3s);
+
+    std::cout << "trigg..." << std::endl;
+
+    for(int i = 0; i < Link::params.pulseCount + 1; i++){
+        for(auto& link: this->links){
+            link->trigger();
+        }
+        std::this_thread::sleep_for(3us);
+    }
+    this->disarm();
 
     return {
             {"ok", true}
@@ -188,6 +194,32 @@ Json AllBoards::handleRequest(Json &req) {
         }else if(req.at("reqtype") == "disarm"){
             this->disarm();
             return this->status();
+        }else if(req.at("reqtype") == "trigger"){
+            if(this->armed){
+                size_t count = 1;
+                if(req.contains("count")){
+                    count = req.at("count");
+                }
+                using namespace std::chrono_literals;
+                std::chrono::microseconds delay = 3us;
+                /*
+                if(req.contains("delay_mks")){
+                    delay = req.at("delay_mks");
+                }
+                 */
+                for(size_t ev = 0; ev < count; ev++){
+                    for(auto& link: this->links){
+                        link->trigger();
+                    }
+                    std::this_thread::sleep_for(delay);
+                }
+                Json resp = this->status();
+                resp["triggered"] = true;
+                return resp;
+            }
+            Json resp = this->status();
+            resp["triggered"] = false;
+            return resp;
         }else{
             return {
                     {"ok", false},
@@ -225,11 +257,40 @@ void AllBoards::arm() {
         return;
     }
 
-    //get shotn
-
     for(auto& link: this->links){
         link->arm();
     }
+
+    this->worker = std::jthread([&links = this->links, &armed = this->armed, &storage = this->diag->storage](std::stop_token stoken){
+        unsigned long long mask = 1 << 8; //allowed: 0b0000111100000000
+        SetThreadAffinityMask(GetCurrentThread(), mask);
+        std::cout << "AllBoards thread: " << SetThreadAffinityMask(GetCurrentThread(), mask) << std::endl;
+
+        size_t current_ind = 0;
+        bool stopped = false;
+        while(!(stoken.stop_requested() or stopped)){
+            bool ready = true;
+            stopped = true;
+            for(auto& link: links){
+                for(auto& node: link->nodes){
+                    ready &= (node->evCount > current_ind);
+                }
+                stopped &= !link->armed;
+            }
+            if(ready){
+                //calc Te, ne, send UDP
+
+                //check once
+                std::cout << "ready event " << current_ind << std::endl;
+                current_ind++;
+            }
+        }
+        std::cout << "allBoards worker is stopping, saving data" << std::endl;
+        storage.save(&links);
+        armed = false;
+        return;
+    });
+
     this->armed = true;
 }
 
@@ -242,15 +303,14 @@ AllBoards::~AllBoards() {
 
 void AllBoards::disarm() {
     if(!this->armed){
-        std::cout << "CAENs arm command ignored: already disarmed" << std::endl;
+        std::cout << "CAENs disarm command ignored: already disarmed" << std::endl;
         return;
     }
     for(auto& link: this->links){
         link->disarm();
     }
 
-    //calculate folder
-    //save data
+    //collect data and push to save
 
     this->armed = false;
 }

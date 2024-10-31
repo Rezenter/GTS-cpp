@@ -2,7 +2,7 @@
 // Created by user on 24.10.2024.
 //
 
-#include "Link.h"
+#include "Caen/Link.h"
 
 #include "iostream"
 
@@ -17,8 +17,6 @@ Node::Node(Params params) {
 
     ok &= CAEN_DGTZ_GetInfo(this->handle, &boardInfo) == CAEN_DGTZ_Success;
     std::cout << "serial " << boardInfo.SerialNumber << std::endl;
-
-    /* reset the digitizer */
 
     ok &= CAEN_DGTZ_Reset(handle) == CAEN_DGTZ_Success;
     if (!ok) {
@@ -43,7 +41,8 @@ Node::Node(Params params) {
         ok &= CAEN_DGTZ_DisableSAMPulseGen(handle, channel) == CAEN_DGTZ_Success;
     }
 
-    ok &= CAEN_DGTZ_SetSWTriggerMode(handle, CAEN_DGTZ_TRGMODE_DISABLED) == CAEN_DGTZ_Success;
+    //ok &= CAEN_DGTZ_SetSWTriggerMode(handle, CAEN_DGTZ_TRGMODE_DISABLED) == CAEN_DGTZ_Success;
+    ok &= CAEN_DGTZ_SetSWTriggerMode(handle, CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT) == CAEN_DGTZ_Success;
     ok &= CAEN_DGTZ_SetChannelSelfTrigger(handle, CAEN_DGTZ_TRGMODE_DISABLED, 0b1111111111111111) == CAEN_DGTZ_Success;
     ok &= CAEN_DGTZ_SetExtTriggerInputMode(handle, CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT) == CAEN_DGTZ_Success;
 
@@ -64,6 +63,10 @@ Node::Node(Params params) {
         return;
     }
 
+    if(Link::params.pulseCount + 1 > MAX_EVENTS){
+        std::cout << "Error: experiment requeue " << Link::params.pulseCount + 1 << " pulses. " << MAX_EVENTS << " is maximum" << std::endl;
+        return;
+    }
     ok &= CAEN_DGTZ_MallocReadoutBuffer(this->handle, &this->readoutBuffer, &readoutBufferSize) == CAEN_DGTZ_Success;
     if (!ok) {
         std::cout << "ADC buffer allocation error" << std::endl;
@@ -122,6 +125,7 @@ bool Node::arm() {
         std::cout <<  "Node Error: Internal Communication Timeout occurred." << std::endl;
         this->armed = false;
     }
+    CAEN_DGTZ_ReadData(this->handle,CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, readoutBuffer, &readoutBufferSize);
     this->armed &= CAEN_DGTZ_ClearData(this->handle) == CAEN_DGTZ_Success;
     this->armed &= CAEN_DGTZ_SWStartAcquisition(this->handle) == CAEN_DGTZ_Success;
     return this->armed;
@@ -176,37 +180,43 @@ void Link::arm() {
 
     this->armed = true;
     for(auto& node: this->nodes){
-        this->armed &= node->arm();
+        if(!node->arm()){
+            this->armed = false;
+        }
     }
     if(!this->armed){
         std::cout << "link failed to arm" << std::endl;
         return;
     }
 
-    this->worker = std::jthread([&nodes = this->nodes, &ind = this->linkInd](std::stop_token stoken){
+    this->worker = std::jthread([&nodes = this->nodes, &ind = this->linkInd, &armed = this->armed](std::stop_token stoken){
         unsigned long long mask = 1 << ind; //allowed: 0b0000000011111111
         SetThreadAffinityMask(GetCurrentThread(), mask);
         std::cout << "Link thread: " << SetThreadAffinityMask(GetCurrentThread(), mask) << std::endl;
 
         while(!stoken.stop_requested()){
+            //std::cout << "link worker iteration " << std::endl;
             bool allReady = true;
             for(auto& node: nodes){
-                allReady &= node->pollNode() == (Link::params.pulseCount + 1);
-                //allReady &= 0 == (Link::params.pulseCount + 1);
-                std::cout << "events: " << node->evCount << std::endl;
+                if(node->evCount < (Link::params.pulseCount + 1)){
+                    node->pollNode();
+                    allReady &= false;
+                }
+                //std::cout << "events: " << node->evCount << std::endl;
             }
             if(allReady){
-                std::cout << "link got all data" << std::endl;
+                std::cout << "link got all data: " << Link::params.pulseCount + 1 << std::endl;
                 for(auto& node: nodes){
                     node->disarm();
                 }
-                return;
+                break;
             }
         }
-        std::cout << "link stopping due to request" << std::endl;
+        std::cout << "link worker is stopping" << std::endl;
         for(auto& node: nodes){
             node->disarm();
         }
+        armed = false;
         return;
     });
 
@@ -220,6 +230,7 @@ void Link::disarm() {
             node->disarm();
             std::cout << "Node " << params.linkInd << ' ' <<  params.nodeInd << " got " << node->evCount << std::endl;
         }
+        this->armed = false;
     }
 }
 

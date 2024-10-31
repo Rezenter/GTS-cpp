@@ -23,10 +23,10 @@ add_executable(GTS-core src/server.cpp
         include/mongoose.c include/mongoose.h include/json.hpp
         src/laser330/Laser330.cpp src/laser330/Laser330.h
         src/Diagnostics/Diagnostics.cpp src/Diagnostics/Diagnostics.h
-        src/Stoppable.h
         src/laser330/Coolant.cpp src/laser330/Coolant.h
         src/Caen/AllBoards.cpp src/Caen/AllBoards.h
         src/Caen/Link.cpp src/Caen/Link.h
+        src/Diagnostics/Storage.cpp src/Diagnostics/Storage.h
         )
 target_link_libraries(GTS-core ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.lib wsock32 ws2_32 )
 

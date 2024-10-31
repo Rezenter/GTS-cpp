@@ -7,6 +7,7 @@
 #include <fstream>
 
 
+
 using Json = nlohmann::json;
 
 Json Diagnostics::handleRequest(Json& payload){
@@ -31,6 +32,8 @@ Json Diagnostics::handleRequest(Json& payload){
                                 {"err", "request has no 'filename'"}
                         };
                     }
+                }else if(payload.at("reqtype") == "status"){
+                       resp = this->status();
                 }else{
                     resp = {
                             {"ok", false},
@@ -98,7 +101,8 @@ void Diagnostics::fn(struct mg_connection *c, int ev, void *ev_data) {
 }
 
 Json Diagnostics::getConfigs() {
-    if(!Diagnostics::configPath.exists()){
+    std::filesystem::directory_entry configPath {Storage::dbRoot.path().string() + "config_cpp\\"};
+    if(!configPath.exists()){
         return Json({
                             {"ok", false},
                             {"err", "hardcoded directory not found: d:\\data\\db\\config_cpp\\"}
@@ -108,7 +112,7 @@ Json Diagnostics::getConfigs() {
                             {"ok", true},
                             {"files", {}}
                     });
-    for (auto const& dir_entry : std::filesystem::directory_iterator{Diagnostics::configPath}) {
+    for (auto const& dir_entry : std::filesystem::directory_iterator{configPath}) {
         resp["files"].push_back(dir_entry.path().filename());
         //std::cout << dir_entry.path() << '\n';
     }
@@ -116,7 +120,7 @@ Json Diagnostics::getConfigs() {
 }
 
 Json Diagnostics::loadConfig(std::string filename) {
-    std::filesystem::directory_entry configFile {Diagnostics::configPath.path().string() + filename};
+    std::filesystem::directory_entry configFile {Storage::dbRoot.path().string() + "config_cpp\\" + filename};
     if(!configFile.exists()){
         return Json({
                      {"ok", false},
@@ -152,7 +156,8 @@ Json Diagnostics::loadConfig(std::string filename) {
                       {"ok", true},
                       {"config", this->config}
               });
-    resp["caens"] = caens.init();
+    caens.init();
+    resp["status"] = this->status();
 
     return resp;
 }
@@ -166,4 +171,26 @@ void Diagnostics::die() {
     std::cout << "  Killing laser" << std::endl;
     //this->laser;
     std::cout << "diag dead" << std::endl;
+}
+
+Json Diagnostics::status() {
+    Json resp = {
+            {"storage", this->storage.status()},
+            {"laser", this->laser.status()},
+            {"coolant", this->coolant.status()},
+            {"caens", this->caens.status()}
+    };
+    return resp;
+}
+
+void Diagnostics::save() {
+    //collect data:
+        //ophir
+        //slow
+        //status
+        //config
+
+    //is_plasma?
+    //calculate folder
+    //save data
 }

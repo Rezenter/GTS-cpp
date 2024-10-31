@@ -13,6 +13,7 @@
 #include "laser330/Laser330.h"
 #include "laser330/Coolant.h"
 #include "Caen/AllBoards.h"
+#include "Diagnostics/Storage.h"
 
 using Json = nlohmann::json;
 
@@ -25,12 +26,14 @@ private:
 
     Coolant coolant;
     AllBoards caens;
-    inline const static std::filesystem::directory_entry configPath {R"(d:\data\db\config_cpp\)"};
+    //inline const static std::filesystem::directory_entry configPath {R"(d:\data\db\config_cpp\)"};
     static Json getConfigs();
     Json loadConfig(std::string filename);
+    Json status();
 
 public:
     Laser330 laser;
+    Storage storage;
     Diagnostics(): caens(this), mgr{nullptr}{};
     static void fn(struct mg_connection *c, int ev, void *ev_data);
     void setMgr(mg_mgr *mgr){
@@ -41,6 +44,7 @@ public:
     Json handleRequest(Json& payload);
     Json config;
     void die();
+    void save();
 };
 
 

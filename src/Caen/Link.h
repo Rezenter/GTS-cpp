@@ -36,13 +36,13 @@ struct Params{
 class Node {
 private:
     bool ok = false;
+    bool armed = false;
     CAEN_DGTZ_BoardInfo_t boardInfo;
     int handle = 0;
     char* readoutBuffer = NULL;
     uint32_t readoutBufferSize = 0;
-    bool armed = false;
-    //static inline const size_t MAX_EVENTS = 262144;
-    static inline const size_t MAX_EVENTS = 2621;
+
+    static inline const size_t MAX_EVENTS = 32768;
     static inline const size_t MAX_CH = 16;
     static inline const size_t MAX_DEPTH = 1024;
     static inline const size_t EVT_SIZE = 34832;
@@ -99,8 +99,19 @@ public:
     //std::array<std::latch*, SHOT_COUNT>& processed;
     std::atomic<size_t> evCount;
     void disarm();
+    const void trigger(){
+        if(this->armed){
+            if(CAEN_DGTZ_SendSWtrigger(this->handle) != CAEN_DGTZ_Success){
+                std::cout << "SW trigger failed" << std::endl;
+            }
+        }
+    };
 
     size_t pollNode(){
+        if(this->evCount >= MAX_EVENTS){
+            std::cout << "Node poll ignored: already too many events in RAM"  << std::endl;
+            return this->evCount;
+        }
         if(CAEN_DGTZ_ReadData(this->handle,CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, readoutBuffer, &readoutBufferSize) != CAEN_DGTZ_Success){
             std::cout << "readout fuckup: "  << std::endl;
             return this->evCount;
@@ -187,10 +198,10 @@ public:
 class Link {
 private:
     static inline unsigned short totalLinks = 0;
-    bool armed = false;
     std::jthread worker;
 
 public:
+    std::atomic<bool> armed = false;
     Link(): linkInd{totalLinks}{
       totalLinks++;
     };
@@ -202,6 +213,13 @@ public:
     void arm();
     static Params params;
     void disarm();
+    void trigger(){
+        if(this->armed){
+            for(auto& node: this->nodes){
+                node->trigger();
+            }
+        }
+    };
 };
 
 
