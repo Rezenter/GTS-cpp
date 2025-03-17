@@ -231,7 +231,7 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
         //MG_INFO(("release queue"));
         std::lock_guard<std::mutex> guard(th->queue_mutex);
         while(!(th->queue.empty() or th->queue.top().priority < 255)){
-            //MG_INFO(("connection closed, drop fired requests"));
+            MG_INFO(("connection closed, drop fired requests")); //drops python requests!
             Request r = th->queue.top();
             th->queue.pop();
             r.priority = 200;
@@ -364,8 +364,7 @@ Json Laser330::status() {
 Json Laser330::setState(Json &req) {
     if(req.contains("target")) {
         uint8_t tgt = req.at("target");
-        uint8_t curr = states.back().state;
-        if(tgt == curr){
+        if(tgt == states.back().state){
             return Json({
                                 {"ok", true}
                         });

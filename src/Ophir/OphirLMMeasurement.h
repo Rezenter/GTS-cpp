@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 #include <functional>
-
+#include <Windows.h>
 #import "progid:OphirLMMeasurement.CoLMMeasurement"
 
 class OphirLMMeasurement : private IDispatch

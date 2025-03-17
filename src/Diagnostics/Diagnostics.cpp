@@ -174,6 +174,7 @@ void Diagnostics::die() {
 }
 
 Json Diagnostics::status() {
+    std::cout << "check time in last states!" << std::endl;
     Json resp = {
             {"storage", this->storage.status()},
             {"laser", this->laser.status()},

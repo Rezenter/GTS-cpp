@@ -31,3 +31,5 @@ add_executable(GTS-core src/server.cpp
 target_link_libraries(GTS-core ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.lib wsock32 ws2_32 )
 
 add_executable(test1 sandbox/test1.cpp)
+
+add_executable(testOphir src/Ophir/debug.cpp src/Ophir/OphirLMMeasurement.h src/Ophir/OphirLMMeasurement.cpp)

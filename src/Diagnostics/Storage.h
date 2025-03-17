@@ -16,18 +16,23 @@
 
 using Json = nlohmann::json;
 
+class Diagnostics;
+
 class Storage {
 public:
+    Storage(Diagnostics* parent): diag{parent}{};
+
     inline const static std::filesystem::directory_entry dbRoot {R"(d:\data\db\)"};
     Json status();
-    void save(std::vector<Link*>* links);
+    void save();
     void arm(bool isPlasma=true);
     static std::string shotn(bool isPlasma=true);
     bool armed = false;
 
 private:
     //inline const static std::filesystem::directory_entry plasmaShotnPath   {R"(z:\SHOTN.txt)"};
-    inline const static std::filesystem::directory_entry plasmaShotnPath   {R"(\\172.16.12.28\Data\SHOTN.txt)"};
+    //inline const static std::filesystem::directory_entry plasmaShotnPath   {R"(\\172.16.12.28\Data\SHOTN.txt)"};
+    inline const static std::filesystem::directory_entry plasmaShotnPath   {R"(\\172.16.12.70\shared\SHOTN.txt)"};
     inline const static std::filesystem::directory_entry debugPath    {dbRoot.path().string() + "debug\\"};
     inline const static std::filesystem::directory_entry plasmaPath    {dbRoot.path().string() + "plasma\\"};
 
@@ -39,6 +44,7 @@ private:
     std::filesystem::directory_entry currentPath;
     unsigned short count = 0;
     bool isPlasma = true;
+    Diagnostics* diag;
 };
 
 

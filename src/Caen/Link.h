@@ -33,6 +33,11 @@ struct Params{
     float firstShot;
 };
 
+union Timestamp{
+    char bytes[8];
+    unsigned long long int integer;
+};
+
 class Node {
 private:
     bool ok = false;
@@ -41,7 +46,7 @@ private:
     int handle = 0;
     char* readoutBuffer = NULL;
     uint32_t readoutBufferSize = 0;
-
+    Timestamp timestampConverter;
     static inline const size_t MAX_EVENTS = 32768;
     static inline const size_t MAX_CH = 16;
     static inline const size_t MAX_DEPTH = 1024;
@@ -108,30 +113,29 @@ public:
     };
 
     size_t pollNode(){
-        if(this->evCount >= MAX_EVENTS){
-            std::cout << "Node poll ignored: already too many events in RAM"  << std::endl;
-            return this->evCount;
-        }
-        if(CAEN_DGTZ_ReadData(this->handle,CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, readoutBuffer, &readoutBufferSize) != CAEN_DGTZ_Success){
+        if(CAEN_DGTZ_ReadData(this->handle, CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, this->readoutBuffer, &this->readoutBufferSize) != CAEN_DGTZ_Success){
             std::cout << "readout fuckup: "  << std::endl;
             return this->evCount;
         }
-        if(readoutBufferSize % Node::EVT_SIZE != 0){
+        if(this->readoutBufferSize % Node::EVT_SIZE != 0){
             std::cout << "readoutBufferSize fuckup: "  << std::endl;
             return this->evCount;
         }else {
-            for(unsigned char event_ind = 0; event_ind < readoutBufferSize / Node::EVT_SIZE; event_ind++) {
-                char* group_pointer = readoutBuffer + Node::EVT_SIZE * event_ind + 16;
-                /*
-                timestampConverter.integer = 0;
-                timestampConverter.bytes[0] = *(group_pointer + 4 * 14 + 3);
-                timestampConverter.bytes[1] = *(group_pointer + 4 * 15 + 3);
-                timestampConverter.bytes[2] = *(group_pointer + 4 * 16 + 3);
-                timestampConverter.bytes[3] = *(group_pointer + 4 * 17 + 3);
-                timestampConverter.bytes[4] = *(group_pointer + 4 * 18 + 3);
-                times[this->evCount] = timestampConverter.integer;
-                 */
-                std::memcpy(&times[this->evCount], group_pointer + 4 * 14 + 3, 5);
+            for(size_t event_ind = 0; event_ind < this->readoutBufferSize / Node::EVT_SIZE; event_ind++) {
+                if(this->evCount >= this->MAX_EVENTS){
+                    std::cout << "Node poll ignored: already too many events in RAM"  << std::endl;
+                    return this->evCount;
+                }
+
+                char* group_pointer = this->readoutBuffer + Node::EVT_SIZE * event_ind + 16;
+
+                this->timestampConverter.integer = 0;
+                this->timestampConverter.bytes[0] = *(group_pointer + 4 * 14 + 3);
+                this->timestampConverter.bytes[1] = *(group_pointer + 4 * 15 + 3);
+                this->timestampConverter.bytes[2] = *(group_pointer + 4 * 16 + 3);
+                this->timestampConverter.bytes[3] = *(group_pointer + 4 * 17 + 3);
+                this->timestampConverter.bytes[4] = *(group_pointer + 4 * 18 + 3);
+                this->times[this->evCount] = this->timestampConverter.integer;
 
                 for(int groupIdx = 0; groupIdx < MAX_V1743_GROUP_SIZE; groupIdx++) {
                     size_t ch1 = 2 * groupIdx;
@@ -140,10 +144,10 @@ public:
                     for(unsigned short sector = 0; sector < 64; sector++) { // 64 sectors per 1024 cell page
                         group_pointer += 4; // skip trash line, not mentioned in datasheet
                         for(unsigned int cell = 0; cell < 16; cell++) {
-                            currentCell = sector * 16 + cell;
-                            this->result[this->evCount][ch1][currentCell] =
+                            this->currentCell = sector * 16 + cell;
+                            this->result[this->evCount][ch1][this->currentCell] =
                                     *reinterpret_cast<unsigned short *>((group_pointer + 4 * cell)) & 0x0FFF;
-                            this->result[this->evCount][ch1][currentCell] = (result[this->evCount][ch1][currentCell] & 0b011111111111) | (~result[this->evCount][ch1][currentCell] & 0b100000000000);
+                            this->result[this->evCount][ch1][this->currentCell] = (result[this->evCount][ch1][this->currentCell] & 0b011111111111) | (~this->result[this->evCount][ch1][this->currentCell] & 0b100000000000);
                             /*
                             if (zeroInd[ch1].first < currentCell && currentCell <= zeroInd[ch1].second) {
                                 zero[this->evCount][ch1] += result[this->evCount][ch1][currentCell];
@@ -153,9 +157,9 @@ public:
                              */
 
 
-                            result[this->evCount][ch2][sector * 16 + cell] =
+                            this->result[this->evCount][ch2][sector * 16 + cell] =
                                     *reinterpret_cast<unsigned short *>((group_pointer + 4 * cell + 1)) >> 4;
-                            result[this->evCount][ch2][currentCell] = (result[this->evCount][ch2][currentCell] & 0b011111111111) | (~result[this->evCount][ch2][currentCell] & 0b100000000000);
+                            this->result[this->evCount][ch2][this->currentCell] = (this->result[this->evCount][ch2][this->currentCell] & 0b011111111111) | (~this->result[this->evCount][ch2][this->currentCell] & 0b100000000000);
                             /*
                             if (zeroInd[ch2].first < currentCell && currentCell <= zeroInd[ch2].second) {
                                 zero[this->evCount][ch2] += result[this->evCount][ch2][currentCell];

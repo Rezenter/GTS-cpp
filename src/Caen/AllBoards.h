@@ -17,6 +17,13 @@ using Json = nlohmann::json;
 
 class Diagnostics;
 
+
+union Buffer{
+    unsigned short int val[2];
+    char chars[4];
+};
+
+
 class AllBoards {
 public:
     explicit AllBoards(Diagnostics* parent): diag{parent} {};
@@ -24,15 +31,17 @@ public:
     Json handleRequest(Json& req);
     ~AllBoards();
     Json status();
+    std::vector<Link*> links;
 
 private:
     std::jthread worker;
-    std::vector<Link*> links;
     Diagnostics* diag;
-    void arm();
+    void arm(bool isPlasma=true);
     void disarm();
-
     bool armed = false;
+    SOCKET sockfd;
+    struct sockaddr_in servaddr;
+    Buffer buffer;
 };
 
 

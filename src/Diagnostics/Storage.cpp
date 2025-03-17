@@ -3,6 +3,7 @@
 //
 
 #include "Storage.h"
+#include "Diagnostics.h"
 
 #include <fstream>
 #include <sstream>
@@ -42,10 +43,17 @@ Json Storage::status() {
                     });
     }
 
-    return {
+    Json resp = {
             {"ok", true},
-            {"shotn", Storage::shotn()}
+            {"shotn", Storage::shotn()},
+            {"debug_shtn", Storage::shotn(false)},
+            {"armed", this->armed}
     };
+    if(this->armed){
+        resp["path"] = this->currentPath;
+        resp["isPlasma"] = this->isPlasma;
+    }
+    return resp;
 }
 
 void Storage::arm(bool isPlasma){
@@ -85,19 +93,45 @@ void Storage::arm(bool isPlasma){
         std::filesystem::create_directory(std::filesystem::directory_entry{
                 this->currentPath.path().string() + "slow\\raw\\" + ss.str() + "_" + std::to_string(this->count) + '\\'});
     }
+    this->currentPath = candidate;
     std::cout << "Storage armed" << std::endl;
     this->armed = true;
 }
 
-void Storage::save(std::vector<Link*>* links) {
+void Storage::save() {
     if(this->armed){
-        for(auto& link: *links){
-            std::cout << "Save got events: " << link->nodes.back()->evCount << std::endl;
-        }
-        //if(){        }
+        std::ofstream outFile;
+        outFile.open(this->currentPath.path().string() + "header.json");
+        outFile <<  diag->config.dump(2) << std::endl;
+        outFile.close();
 
-        //is plasma
-        //arm?
+        int count = 0;
+        std::stringstream filename;
+        for(auto& link: this->diag->caens.links){
+            for(auto& node: link->nodes){
+                //std::cout << "Save got events: " << node->evCount << std::endl;
+                Json boardData = Json::array();
+                for (size_t event_ind = 0; event_ind < node->evCount; event_ind++) {
+                    boardData.push_back({
+                                                {"ch",    node->result[event_ind]},
+                                                {"ph_el", node->ph_el[event_ind]},
+                                                {"t",     (double)(node->times[event_ind] - node->times[0]) * 5e-6},
+                                                {"t_raw", node->times[event_ind]}
+                                        });
+                }
+                //boardData[0]["t"] = 0;
+
+                filename.str(std::string());
+                filename << count++ << ".msgpk";
+                outFile.open(this->currentPath.path().string() + filename.str(), std::ios::out | std::ios::binary);
+                for (const auto &e : Json::to_msgpack(boardData)) outFile << e;
+                outFile.close();
+            }
+        }
+
+
+        std::cout << "Files written: " << this->currentPath.path().string() << std::endl;
+
         this->armed = false;
         if(!this->isPlasma){
             int shotn = std::stoi(Storage::shotn(false)) + 1;

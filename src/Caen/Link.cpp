@@ -8,67 +8,68 @@
 
 Node::Node(Params params) {
     this->evCount = 0;
-    ok = CAEN_DGTZ_OpenDigitizer2(CAEN_DGTZ_OpticalLink, reinterpret_cast<void *>(&params.linkInd), params.nodeInd, 0, &this->handle) == CAEN_DGTZ_Success;
+    this->params = params;
+    this->ok = CAEN_DGTZ_OpenDigitizer2(CAEN_DGTZ_OpticalLink, reinterpret_cast<void *>(&this->params.linkInd), this->params.nodeInd, 0, &this->handle) == CAEN_DGTZ_Success;
     if (!ok) {
-        std::cout << "Can't open digitizer " << params.linkInd << ' ' <<  params.nodeInd << std::endl;
+        std::cout << "Can't open digitizer " << this->params.linkInd << ' ' <<  this->params.nodeInd << std::endl;
         return;
     }
-    std::cout << "Connected digitizer " << params.linkInd << ' ' <<  params.nodeInd << std::endl;
+    std::cout << "Connected digitizer " << this->params.linkInd << ' ' <<  this->params.nodeInd << std::endl;
 
-    ok &= CAEN_DGTZ_GetInfo(this->handle, &boardInfo) == CAEN_DGTZ_Success;
-    std::cout << "serial " << boardInfo.SerialNumber << std::endl;
+    this->ok &= CAEN_DGTZ_GetInfo(this->handle, &this->boardInfo) == CAEN_DGTZ_Success;
+    std::cout << "serial " << this->boardInfo.SerialNumber << std::endl;
 
-    ok &= CAEN_DGTZ_Reset(handle) == CAEN_DGTZ_Success;
-    if (!ok) {
+    this->ok &= CAEN_DGTZ_Reset(this->handle) == CAEN_DGTZ_Success;
+    if (!this->ok) {
         std::cout <<  "Unable to reset Node" << std::endl;
     }
 
     //Board Fail Status
     uint32_t d32 = 0;
-    ok &= CAEN_DGTZ_ReadRegister(handle, 0x8178, &d32) == CAEN_DGTZ_Success;
+    this->ok &= CAEN_DGTZ_ReadRegister(this->handle, 0x8178, &d32) == CAEN_DGTZ_Success;
     if ((d32 & 0xF) != 0) {
         std::cout <<  "Node Error: Internal Communication Timeout occurred." << std::endl;
-        ok = false;
+        this->ok = false;
     }
 
-    ok &= CAEN_DGTZ_SetGroupEnableMask(this->handle, 0b1111111111111111) == CAEN_DGTZ_Success;
+    this->ok &= CAEN_DGTZ_SetGroupEnableMask(this->handle, 0b1111111111111111) == CAEN_DGTZ_Success;
     for (int sam_idx = 0; sam_idx < MAX_V1743_GROUP_SIZE; sam_idx++) {
-        ok &= CAEN_DGTZ_SetSAMPostTriggerSize(this->handle, sam_idx, params.triggerDelay) == CAEN_DGTZ_Success;
+        this->ok &= CAEN_DGTZ_SetSAMPostTriggerSize(this->handle, sam_idx, this->params.triggerDelay) == CAEN_DGTZ_Success;
     }
-    ok &= CAEN_DGTZ_SetSAMSamplingFrequency(this->handle, params.frequency) == CAEN_DGTZ_Success;
+    this->ok &= CAEN_DGTZ_SetSAMSamplingFrequency(this->handle, this->params.frequency) == CAEN_DGTZ_Success;
 
-    for (int channel = 0; channel < this->MAX_CH; channel++) {
-        ok &= CAEN_DGTZ_DisableSAMPulseGen(handle, channel) == CAEN_DGTZ_Success;
+    for (int channel = 0; channel < Node::MAX_CH; channel++) {
+        this->ok &= CAEN_DGTZ_DisableSAMPulseGen(this->handle, channel) == CAEN_DGTZ_Success;
     }
 
     //ok &= CAEN_DGTZ_SetSWTriggerMode(handle, CAEN_DGTZ_TRGMODE_DISABLED) == CAEN_DGTZ_Success;
-    ok &= CAEN_DGTZ_SetSWTriggerMode(handle, CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT) == CAEN_DGTZ_Success;
-    ok &= CAEN_DGTZ_SetChannelSelfTrigger(handle, CAEN_DGTZ_TRGMODE_DISABLED, 0b1111111111111111) == CAEN_DGTZ_Success;
-    ok &= CAEN_DGTZ_SetExtTriggerInputMode(handle, CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT) == CAEN_DGTZ_Success;
+    this->ok &= CAEN_DGTZ_SetSWTriggerMode(this->handle, CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT) == CAEN_DGTZ_Success;
+    this->ok &= CAEN_DGTZ_SetChannelSelfTrigger(this->handle, CAEN_DGTZ_TRGMODE_DISABLED, 0b1111111111111111) == CAEN_DGTZ_Success;
+    this->ok &= CAEN_DGTZ_SetExtTriggerInputMode(this->handle, CAEN_DGTZ_TRGMODE_ACQ_AND_EXTOUT) == CAEN_DGTZ_Success;
 
     for (int ch = 0; ch < 16; ch++) {
-        ok &= CAEN_DGTZ_SetChannelDCOffset(this->handle, ch, params.offsetADC) == CAEN_DGTZ_Success;
+        this->ok &= CAEN_DGTZ_SetChannelDCOffset(this->handle, ch, this->params.offsetADC) == CAEN_DGTZ_Success;
     }
 
     /* Set Correction Level */
     //ret |= CAEN_DGTZ_SetSAMCorrectionLevel(handle, WDb->CorrectionLevel);
     std::cout << "what the fuck is SAM correction?\n\n" << std::endl;
 
-    ok &= CAEN_DGTZ_SetMaxNumEventsBLT(this->handle, params.maxEventTransfer) == CAEN_DGTZ_Success;
-    ok &= CAEN_DGTZ_SetRecordLength(this->handle, params.recordLength) == CAEN_DGTZ_Success;
-    ok &= CAEN_DGTZ_SetIOLevel(this->handle, params.triggerLevel) == CAEN_DGTZ_Success;
-    ok &= CAEN_DGTZ_SetAcquisitionMode(this->handle, CAEN_DGTZ_SW_CONTROLLED) == CAEN_DGTZ_Success;
-    if (!ok) {
-        std::cout << "ADC " << params.linkInd << ' ' <<  params.nodeInd << " initialisation error" << std::endl;
+    this->ok &= CAEN_DGTZ_SetMaxNumEventsBLT(this->handle, this->params.maxEventTransfer) == CAEN_DGTZ_Success;
+    this->ok &= CAEN_DGTZ_SetRecordLength(this->handle, this->params.recordLength) == CAEN_DGTZ_Success;
+    this->ok &= CAEN_DGTZ_SetIOLevel(this->handle, this->params.triggerLevel) == CAEN_DGTZ_Success;
+    this->ok &= CAEN_DGTZ_SetAcquisitionMode(this->handle, CAEN_DGTZ_SW_CONTROLLED) == CAEN_DGTZ_Success;
+    if (!this->ok) {
+        std::cout << "ADC " << this->params.linkInd << ' ' <<  this->params.nodeInd << " initialisation error" << std::endl;
         return;
     }
 
-    if(Link::params.pulseCount + 1 > MAX_EVENTS){
-        std::cout << "Error: experiment requeue " << Link::params.pulseCount + 1 << " pulses. " << MAX_EVENTS << " is maximum" << std::endl;
+    if(this->params.pulseCount + 1 > Node::MAX_EVENTS){
+        std::cout << "Error: experiment requeue " << this->params.pulseCount + 1 << " pulses. " << Node::MAX_EVENTS << " is maximum" << std::endl;
         return;
     }
-    ok &= CAEN_DGTZ_MallocReadoutBuffer(this->handle, &this->readoutBuffer, &readoutBufferSize) == CAEN_DGTZ_Success;
-    if (!ok) {
+    this->ok &= CAEN_DGTZ_MallocReadoutBuffer(this->handle, &this->readoutBuffer, &this->readoutBufferSize) == CAEN_DGTZ_Success;
+    if (!this->ok) {
         std::cout << "ADC buffer allocation error" << std::endl;
         return;
     }
@@ -86,16 +87,17 @@ Node::~Node() {
 }
 
 Json Node::status() {
-    //Board Fail Status
-    ok = CAEN_DGTZ_GetInfo(this->handle, &this->boardInfo) == CAEN_DGTZ_Success;
-    uint32_t d32 = 0;
-    ok &= CAEN_DGTZ_ReadRegister(handle, 0x8178, &d32) == CAEN_DGTZ_Success;
-    if ((d32 & 0xF) != 0) {
-        std::cout <<  "Node Error: Internal Communication Timeout occurred." << std::endl;
-        ok = false;
+    if(!this->armed){
+        this->ok = CAEN_DGTZ_GetInfo(this->handle, &this->boardInfo) == CAEN_DGTZ_Success;
+        uint32_t d32 = 0;
+        this->ok &= CAEN_DGTZ_ReadRegister(this->handle, 0x8178, &d32) == CAEN_DGTZ_Success;
+        if ((d32 & 0xF) != 0) {
+            std::cout <<  "Node Error: Internal Communication Timeout occurred." << std::endl;
+            this->ok = false;
+        }
     }
     return {
-            {"ok", ok},
+            {"ok", this->ok},
             {"armed", this->armed}
     };
 }
@@ -108,24 +110,24 @@ bool Node::arm() {
 
     this->evCount = 0;
     for(size_t evenInd = 0; evenInd < Node::MAX_EVENTS; evenInd++){
-        times[evenInd] = 0;
+        this->times[evenInd] = 0;
         for(size_t ch_ind = 0; ch_ind < Node::MAX_CH; ch_ind++){
-            zero[evenInd][ch_ind] = 0;
-            ph_el[evenInd][ch_ind] = 0;
+            this->zero[evenInd][ch_ind] = 0;
+            this->ph_el[evenInd][ch_ind] = 0;
             for(size_t cell_ind = 0; cell_ind < Node::MAX_DEPTH; cell_ind++){
-                result[evenInd][ch_ind][cell_ind] = 0;
+                this->result[evenInd][ch_ind][cell_ind] = 0;
             }
         }
     }
 
     this->armed = CAEN_DGTZ_GetInfo(this->handle, &this->boardInfo) == CAEN_DGTZ_Success;
     uint32_t d32 = 0;
-    this->armed &= CAEN_DGTZ_ReadRegister(handle, 0x8178, &d32) == CAEN_DGTZ_Success;
+    this->armed &= CAEN_DGTZ_ReadRegister(this->handle, 0x8178, &d32) == CAEN_DGTZ_Success;
     if ((d32 & 0xF) != 0) {
         std::cout <<  "Node Error: Internal Communication Timeout occurred." << std::endl;
         this->armed = false;
     }
-    CAEN_DGTZ_ReadData(this->handle,CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, readoutBuffer, &readoutBufferSize);
+    CAEN_DGTZ_ReadData(this->handle,CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, this->readoutBuffer, &this->readoutBufferSize);
     this->armed &= CAEN_DGTZ_ClearData(this->handle) == CAEN_DGTZ_Success;
     this->armed &= CAEN_DGTZ_SWStartAcquisition(this->handle) == CAEN_DGTZ_Success;
     return this->armed;
@@ -136,7 +138,7 @@ void Node::disarm() {
         if (CAEN_DGTZ_SWStopAcquisition(this->handle) != CAEN_DGTZ_Success) {
             std::cout << "failed to stop ADC" << std::endl;
         }
-        CAEN_DGTZ_ClearData(handle);
+        CAEN_DGTZ_ClearData(this->handle);
         this->armed = false;
     }
 }

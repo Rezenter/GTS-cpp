@@ -25,7 +25,7 @@ private:
     mg_mgr* mgr;
 
     Coolant coolant;
-    AllBoards caens;
+
     //inline const static std::filesystem::directory_entry configPath {R"(d:\data\db\config_cpp\)"};
     static Json getConfigs();
     Json loadConfig(std::string filename);
@@ -34,7 +34,8 @@ private:
 public:
     Laser330 laser;
     Storage storage;
-    Diagnostics(): caens(this), mgr{nullptr}{};
+    AllBoards caens;
+    Diagnostics(): caens(this), storage(this), mgr{nullptr}{};
     static void fn(struct mg_connection *c, int ev, void *ev_data);
     void setMgr(mg_mgr *mgr){
         this->mgr = mgr;

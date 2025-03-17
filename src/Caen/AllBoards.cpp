@@ -161,6 +161,11 @@ Json AllBoards::init() {
         Link::params.linkInd++;
     }
 
+    memset(&servaddr, 0, sizeof(servaddr));
+    this->servaddr.sin_family = AF_INET;
+    this->servaddr.sin_port = htons(8080);
+    this->servaddr.sin_addr.s_addr = inet_addr("192.168.10.56");
+
     //debug
     std::cout << "debug arm & software trigger" << std::endl;
     this->diag->storage.arm(false);
@@ -189,7 +194,16 @@ Json AllBoards::handleRequest(Json &req) {
         if(req.at("reqtype") == "status"){
             return this->status();
         }else if(req.at("reqtype") == "arm"){
-            this->arm();
+            if (req.contains("header")) {
+                this->diag->config["default_calibrations"] = req["header"];
+            } else {
+                this->diag->config["default_calibrations"] = {};
+            }
+            bool isPlasma = true;
+            if (req.contains("isPlasma")) {
+                isPlasma = req["isPlasma"];
+            }
+            this->arm(isPlasma);
             return this->status();
         }else if(req.at("reqtype") == "disarm"){
             this->disarm();
@@ -251,15 +265,21 @@ Json AllBoards::status() {
     return resp;
 }
 
-void AllBoards::arm() {
+void AllBoards::arm(bool isPlasma) {
     if(this->armed){
         std::cout << "CAENs arm command ignored: already armed" << std::endl;
         return;
     }
-
+    this->diag->storage.arm(isPlasma);
     for(auto& link: this->links){
         link->arm();
     }
+
+    this->buffer.val[0] = 0;
+    this->buffer.val[1] = 0;
+    sendto(this->sockfd, this->buffer.chars, 4,
+           0, (const struct sockaddr *) &this->servaddr,
+           sizeof(this->servaddr));
 
     this->worker = std::jthread([&links = this->links, &armed = this->armed, &storage = this->diag->storage](std::stop_token stoken){
         unsigned long long mask = 1 << 8; //allowed: 0b0000111100000000
@@ -282,11 +302,18 @@ void AllBoards::arm() {
 
                 //check once
                 std::cout << "ready event " << current_ind << std::endl;
+
+                /*
+                sendto(sockfd, buffer.chars, 4,
+                       0, (const struct sockaddr *) &servaddr,
+                       sizeof(servaddr));
+                */
+
                 current_ind++;
             }
         }
         std::cout << "allBoards worker is stopping, saving data" << std::endl;
-        storage.save(&links);
+        storage.save();
         armed = false;
         return;
     });
@@ -309,8 +336,7 @@ void AllBoards::disarm() {
     for(auto& link: this->links){
         link->disarm();
     }
+    this->worker.request_stop();
 
-    //collect data and push to save
-
-    this->armed = false;
+    //this->armed = false; //should be set by worker
 }

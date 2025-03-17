@@ -6,15 +6,16 @@ path = 'd:/data/db/debug/raw/'
 group_count = 8
 _ch_count = 2
 
-shotn = 702
+shotn = 863
 
-shot_folder = '%s%05d' % (path, shotn)
+shot_folder = '%s%05d_0' % (path, shotn)
 FILE_EXT = 'msgpk'
 
 data = []
 for board in range(8):
     with open('%s/%s.%s' % (shot_folder, '%s' % board, FILE_EXT), 'rb') as file:
         data.append(msgpack.unpackb(file.read()))
+        pass
 
 for event_ind in range(len(data[0])):
     line = '%d ' % data[1][event_ind]['DAC1']
