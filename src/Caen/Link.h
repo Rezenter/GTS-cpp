@@ -16,6 +16,7 @@
 #include <thread>
 #include <atomic>
 #include <iostream>
+#include <climits>
 
 using Json = nlohmann::json;
 
@@ -47,7 +48,7 @@ private:
     char* readoutBuffer = NULL;
     uint32_t readoutBufferSize = 0;
     Timestamp timestampConverter;
-    static inline const size_t MAX_EVENTS = 32768;
+    static inline const size_t MAX_EVENTS = 16384;
     static inline const size_t MAX_CH = 16;
     static inline const size_t MAX_DEPTH = 1024;
     static inline const size_t EVT_SIZE = 34832;
@@ -89,6 +90,7 @@ private:
             {520, 670},
             {520, 670}
     };
+    std::atomic<long long> timestamp = LLONG_MAX;
 
 public:
     Node(Params params);
@@ -104,95 +106,110 @@ public:
     //std::array<std::latch*, SHOT_COUNT>& processed;
     std::atomic<size_t> evCount;
     void disarm();
+    std::atomic<size_t> trigger = 0;
+    /*
     const void trigger(){
         if(this->armed){
+            //std::cout << "trigger link " << this->params.linkInd << " from thread " << GetCurrentThreadId() << std::endl;
+            
             if(CAEN_DGTZ_SendSWtrigger(this->handle) != CAEN_DGTZ_Success){
-                std::cout << "SW trigger failed" << std::endl;
+                std::cout << this->params.linkInd << " SW trigger failed" << std::endl;
             }
         }
-    };
+    };*/
 
     size_t pollNode(){
         if(CAEN_DGTZ_ReadData(this->handle, CAEN_DGTZ_SLAVE_TERMINATED_READOUT_MBLT, this->readoutBuffer, &this->readoutBufferSize) != CAEN_DGTZ_Success){
             std::cout << "readout fuckup: "  << std::endl;
             return this->evCount;
         }
+        this->timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         if(this->readoutBufferSize % Node::EVT_SIZE != 0){
             std::cout << "readoutBufferSize fuckup: "  << std::endl;
             return this->evCount;
-        }else {
-            for(size_t event_ind = 0; event_ind < this->readoutBufferSize / Node::EVT_SIZE; event_ind++) {
-                if(this->evCount >= this->MAX_EVENTS){
-                    std::cout << "Node poll ignored: already too many events in RAM"  << std::endl;
-                    return this->evCount;
-                }
+        }
 
-                char* group_pointer = this->readoutBuffer + Node::EVT_SIZE * event_ind + 16;
-
-                this->timestampConverter.integer = 0;
-                this->timestampConverter.bytes[0] = *(group_pointer + 4 * 14 + 3);
-                this->timestampConverter.bytes[1] = *(group_pointer + 4 * 15 + 3);
-                this->timestampConverter.bytes[2] = *(group_pointer + 4 * 16 + 3);
-                this->timestampConverter.bytes[3] = *(group_pointer + 4 * 17 + 3);
-                this->timestampConverter.bytes[4] = *(group_pointer + 4 * 18 + 3);
-                this->times[this->evCount] = this->timestampConverter.integer;
-
-                for(int groupIdx = 0; groupIdx < MAX_V1743_GROUP_SIZE; groupIdx++) {
-                    size_t ch1 = 2 * groupIdx;
-                    size_t ch2 = ch1 + 1;
-
-                    for(unsigned short sector = 0; sector < 64; sector++) { // 64 sectors per 1024 cell page
-                        group_pointer += 4; // skip trash line, not mentioned in datasheet
-                        for(unsigned int cell = 0; cell < 16; cell++) {
-                            this->currentCell = sector * 16 + cell;
-                            this->result[this->evCount][ch1][this->currentCell] =
-                                    *reinterpret_cast<unsigned short *>((group_pointer + 4 * cell)) & 0x0FFF;
-                            this->result[this->evCount][ch1][this->currentCell] = (result[this->evCount][ch1][this->currentCell] & 0b011111111111) | (~this->result[this->evCount][ch1][this->currentCell] & 0b100000000000);
-                            /*
-                            if (zeroInd[ch1].first < currentCell && currentCell <= zeroInd[ch1].second) {
-                                zero[this->evCount][ch1] += result[this->evCount][ch1][currentCell];
-                            } else if (signalInd[ch1].first < currentCell && currentCell <= signalInd[ch1].second) {
-                                ph_el[this->evCount][ch1] += result[this->evCount][ch1][currentCell];
-                            }
-                             */
-
-
-                            this->result[this->evCount][ch2][sector * 16 + cell] =
-                                    *reinterpret_cast<unsigned short *>((group_pointer + 4 * cell + 1)) >> 4;
-                            this->result[this->evCount][ch2][this->currentCell] = (this->result[this->evCount][ch2][this->currentCell] & 0b011111111111) | (~this->result[this->evCount][ch2][this->currentCell] & 0b100000000000);
-                            /*
-                            if (zeroInd[ch2].first < currentCell && currentCell <= zeroInd[ch2].second) {
-                                zero[this->evCount][ch2] += result[this->evCount][ch2][currentCell];
-                            } else if (signalInd[ch2].first < currentCell && currentCell <= signalInd[ch2].second) {
-                                ph_el[this->evCount][ch2] += result[this->evCount][ch2][currentCell];
-                            }
-                             */
-                        }
-                        group_pointer += 4 * 16;
-                    }
-                    /*
-                    zero[this->evCount][ch1] = (config->offset - 1250 + RESOLUTION * zero[this->evCount][ch1]) / (zeroInd[ch1].second - zeroInd[ch1].first);
-                    zero[this->evCount][ch2] = (config->offset - 1250 + RESOLUTION * zero[this->evCount][ch2]) / (zeroInd[ch2].second - zeroInd[ch2].first);
-
-                    ph_el[this->evCount][ch1] = config->offset - 1250 + RESOLUTION * ph_el[this->evCount][ch1];
-                    unsigned int tmp = zero[this->evCount][ch1] * (signalInd[ch1].second - signalInd[ch1].first);
-                    if (ph_el[this->evCount][ch1] > tmp){
-                        ph_el[this->evCount][ch1] -= tmp;
-                    }else{
-                        ph_el[this->evCount][ch1] = 0;
-                    }
-
-                    ph_el[this->evCount][ch2] = config->offset - 1250 + RESOLUTION * ph_el[this->evCount][ch2];
-                    tmp = zero[this->evCount][ch2] * (signalInd[ch2].second - signalInd[ch2].first);
-                    if (ph_el[this->evCount][ch2] > tmp){
-                        ph_el[this->evCount][ch2] -= tmp;
-                    }else{
-                        ph_el[this->evCount][ch2] = 0;
-                    }
-                     */
-                }
-                this->evCount++;
+        for(size_t event_ind = 0; event_ind < this->readoutBufferSize / Node::EVT_SIZE; event_ind++) {
+            if(this->evCount >= this->MAX_EVENTS){
+                std::cout << "Node poll ignored: already too many events in RAM"  << std::endl;
+                return this->evCount;
             }
+
+            char* group_pointer = this->readoutBuffer + Node::EVT_SIZE * event_ind + 16;
+
+            this->timestampConverter.integer = 0;
+            this->timestampConverter.bytes[0] = *(group_pointer + 4 * 14 + 3);
+            this->timestampConverter.bytes[1] = *(group_pointer + 4 * 15 + 3);
+            this->timestampConverter.bytes[2] = *(group_pointer + 4 * 16 + 3);
+            this->timestampConverter.bytes[3] = *(group_pointer + 4 * 17 + 3);
+            this->timestampConverter.bytes[4] = *(group_pointer + 4 * 18 + 3);
+            this->times[this->evCount] = this->timestampConverter.integer;
+
+            for(int groupIdx = 0; groupIdx < MAX_V1743_GROUP_SIZE; groupIdx++) {
+                size_t ch1 = 2 * groupIdx;
+                size_t ch2 = ch1 + 1;
+
+                for(unsigned short sector = 0; sector < 64; sector++) { // 64 sectors per 1024 cell page
+                    group_pointer += 4; // skip trash line, not mentioned in datasheet
+                    for(unsigned int cell = 0; cell < 16; cell++) {
+                        this->currentCell = sector * 16 + cell;
+                        this->result[this->evCount][ch1][this->currentCell] =
+                                *reinterpret_cast<unsigned short *>((group_pointer + 4 * cell)) & 0x0FFF;
+                        this->result[this->evCount][ch1][this->currentCell] = (result[this->evCount][ch1][this->currentCell] & 0b011111111111) | (~this->result[this->evCount][ch1][this->currentCell] & 0b100000000000);
+                        /*
+                        if (zeroInd[ch1].first < currentCell && currentCell <= zeroInd[ch1].second) {
+                            zero[this->evCount][ch1] += result[this->evCount][ch1][currentCell];
+                        } else if (signalInd[ch1].first < currentCell && currentCell <= signalInd[ch1].second) {
+                            ph_el[this->evCount][ch1] += result[this->evCount][ch1][currentCell];
+                        }
+                        */
+
+
+                        this->result[this->evCount][ch2][sector * 16 + cell] =
+                                *reinterpret_cast<unsigned short *>((group_pointer + 4 * cell + 1)) >> 4;
+                        this->result[this->evCount][ch2][this->currentCell] = (this->result[this->evCount][ch2][this->currentCell] & 0b011111111111) | (~this->result[this->evCount][ch2][this->currentCell] & 0b100000000000);
+                        /*
+                        if (zeroInd[ch2].first < currentCell && currentCell <= zeroInd[ch2].second) {
+                            zero[this->evCount][ch2] += result[this->evCount][ch2][currentCell];
+                        } else if (signalInd[ch2].first < currentCell && currentCell <= signalInd[ch2].second) {
+                            ph_el[this->evCount][ch2] += result[this->evCount][ch2][currentCell];
+                        }
+                        */
+                    }
+                    group_pointer += 4 * 16;
+                }
+                /*
+                zero[this->evCount][ch1] = (config->offset - 1250 + RESOLUTION * zero[this->evCount][ch1]) / (zeroInd[ch1].second - zeroInd[ch1].first);
+                zero[this->evCount][ch2] = (config->offset - 1250 + RESOLUTION * zero[this->evCount][ch2]) / (zeroInd[ch2].second - zeroInd[ch2].first);
+
+                ph_el[this->evCount][ch1] = config->offset - 1250 + RESOLUTION * ph_el[this->evCount][ch1];
+                unsigned int tmp = zero[this->evCount][ch1] * (signalInd[ch1].second - signalInd[ch1].first);
+                if (ph_el[this->evCount][ch1] > tmp){
+                    ph_el[this->evCount][ch1] -= tmp;
+                }else{
+                    ph_el[this->evCount][ch1] = 0;
+                }
+
+                ph_el[this->evCount][ch2] = config->offset - 1250 + RESOLUTION * ph_el[this->evCount][ch2];
+                tmp = zero[this->evCount][ch2] * (signalInd[ch2].second - signalInd[ch2].first);
+                if (ph_el[this->evCount][ch2] > tmp){
+                    ph_el[this->evCount][ch2] -= tmp;
+                }else{
+                    ph_el[this->evCount][ch2] = 0;
+                }
+                */
+            }
+            this->evCount++;
+        }
+        
+        if(this->trigger != 0){
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(2us);
+            if(CAEN_DGTZ_SendSWtrigger(this->handle) != CAEN_DGTZ_Success){
+                std::cout << this->params.linkInd << " SW trigger failed" << std::endl;
+            }
+            //std::this_thread::sleep_for(1ms);
+            this->trigger--;
         }
         return this->evCount;
     };
@@ -217,10 +234,10 @@ public:
     void arm();
     static Params params;
     void disarm();
-    void trigger(){
+    void trigger(size_t count){
         if(this->armed){
             for(auto& node: this->nodes){
-                node->trigger();
+                node->trigger += count;
             }
         }
     };

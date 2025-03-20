@@ -4,19 +4,18 @@
 
 #include <iostream>
 
+#include <cassert>
+#include <deque>
+
 int main(){
-    bool stop = false;
-    bool stopped = false;
-    int i = 0;
-    std::cout << stop << ' ' << stopped << ' ' << i << std::endl;
-    while(!(stop or stopped)){
-        std::cout << stop << ' ' << stopped << ' ' << i << std::endl;
-        if(i < 10){
-            i++;
-        }else{
-            stopped = true;
-        }
-    }
-    std::cout << stop << ' ' << stopped << ' ' << i << std::endl;
+
+
+    std::deque<char> letters{'a', 'b', 'c', 'd'};
+    auto b = letters.back();
+    std::cout << b << std::endl;
+    letters.emplace_back('f');
+    std::cout << b << std::endl;
+    std::cout << letters.back() << std::endl;
+
     return 0;
 };

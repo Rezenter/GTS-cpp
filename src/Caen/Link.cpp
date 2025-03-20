@@ -53,7 +53,7 @@ Node::Node(Params params) {
 
     /* Set Correction Level */
     //ret |= CAEN_DGTZ_SetSAMCorrectionLevel(handle, WDb->CorrectionLevel);
-    std::cout << "what the fuck is SAM correction?\n\n" << std::endl;
+    //std::cout << "what the fuck is SAM correction?\n\n" << std::endl;
 
     this->ok &= CAEN_DGTZ_SetMaxNumEventsBLT(this->handle, this->params.maxEventTransfer) == CAEN_DGTZ_Success;
     this->ok &= CAEN_DGTZ_SetRecordLength(this->handle, this->params.recordLength) == CAEN_DGTZ_Success;
@@ -73,17 +73,18 @@ Node::Node(Params params) {
         std::cout << "ADC buffer allocation error" << std::endl;
         return;
     }
+    this->timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 Node::~Node() {
     this->disarm();
 
-    std::cout << "caen node destructor..." << std::endl;
+    //std::cout << "caen node destructor..." << std::endl;
 
     CAEN_DGTZ_FreeReadoutBuffer(&this->readoutBuffer);
     CAEN_DGTZ_CloseDigitizer(this->handle);
 
-    std::cout << "caen node destructor OK" << std::endl;
+    //std::cout << "caen node destructor OK" << std::endl;
 }
 
 Json Node::status() {
@@ -94,11 +95,14 @@ Json Node::status() {
         if ((d32 & 0xF) != 0) {
             std::cout <<  "Node Error: Internal Communication Timeout occurred." << std::endl;
             this->ok = false;
+        }else{
+            this->timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         }
-    }
+    }   
     return {
             {"ok", this->ok},
-            {"armed", this->armed}
+            {"armed", this->armed},
+            {"timestamp", this->timestamp.load()}
     };
 }
 
@@ -108,6 +112,7 @@ bool Node::arm() {
         return true;
     }
 
+    this->trigger = 0;
     this->evCount = 0;
     for(size_t evenInd = 0; evenInd < Node::MAX_EVENTS; evenInd++){
         this->times[evenInd] = 0;
@@ -134,7 +139,10 @@ bool Node::arm() {
 }
 
 void Node::disarm() {
+    //std::cout << "node " << this->params.linkInd << " triggers left: " << this->trigger << std::endl;
+    
     if(this->armed){
+        this->trigger = 0;
         if (CAEN_DGTZ_SWStopAcquisition(this->handle) != CAEN_DGTZ_Success) {
             std::cout << "failed to stop ADC" << std::endl;
         }
@@ -148,29 +156,32 @@ void Link::addNode() {
 }
 
 Link::~Link() {
-    std::cout << "caen link destructor..." << std::endl;
+    //std::cout << "caen link destructor..." << std::endl;
     this->disarm();
     while(!this->nodes.empty()){
-
         delete this->nodes.back();
         this->nodes.pop_back();
     }
-    std::cout << "caen link destructor OK" << std::endl;
+    //std::cout << "caen link destructor OK" << std::endl;
 }
 
 Json Link::status() {
     Json resp = {
             {"ok", true},
-            {"nodes", {}}
+            {"nodes", {}},
+            {"timestamp", 0}
     };
+    long long timestamp = 0;
     for(auto& node: this->nodes){
         Json nodeStatus = node->status();
+        timestamp = max(timestamp, (long long)nodeStatus["timestamp"]);
         resp["nodes"].push_back(nodeStatus);
         if(!nodeStatus["ok"]){
             resp["ok"] = false;
             resp["err"] = "Dead caen node ind.: " + std::to_string(node->params.nodeInd);
         }
     }
+    resp["timestamp"] = timestamp;
     return resp;
 }
 
@@ -194,7 +205,7 @@ void Link::arm() {
     this->worker = std::jthread([&nodes = this->nodes, &ind = this->linkInd, &armed = this->armed](std::stop_token stoken){
         unsigned long long mask = 1 << ind; //allowed: 0b0000000011111111
         SetThreadAffinityMask(GetCurrentThread(), mask);
-        std::cout << "Link thread: " << SetThreadAffinityMask(GetCurrentThread(), mask) << std::endl;
+        //std::cout << "Link " << ind << " assigned thread: " << SetThreadAffinityMask(GetCurrentThread(), mask) << " " << GetCurrentThreadId() << std::endl;
 
         while(!stoken.stop_requested()){
             //std::cout << "link worker iteration " << std::endl;
@@ -207,14 +218,14 @@ void Link::arm() {
                 //std::cout << "events: " << node->evCount << std::endl;
             }
             if(allReady){
-                std::cout << "link got all data: " << Link::params.pulseCount + 1 << std::endl;
+                std::cout << "link " << ind << " got all data: " << Link::params.pulseCount + 1 << std::endl;
                 for(auto& node: nodes){
                     node->disarm();
                 }
                 break;
             }
         }
-        std::cout << "link worker is stopping" << std::endl;
+        std::cout << "link " << ind << " worker is stopping" << std::endl;
         for(auto& node: nodes){
             node->disarm();
         }
@@ -230,7 +241,7 @@ void Link::disarm() {
         this->worker.join();
         for(auto& node: this->nodes){
             node->disarm();
-            std::cout << "Node " << params.linkInd << ' ' <<  params.nodeInd << " got " << node->evCount << std::endl;
+            std::cout << "Node " << node->params.linkInd << ' ' <<  node->params.nodeInd << " got " << node->evCount << std::endl;
         }
         this->armed = false;
     }

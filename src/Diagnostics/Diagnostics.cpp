@@ -65,12 +65,14 @@ Json Diagnostics::handleRequest(Json& payload){
                 {"err", "request has no 'subsystem'"}
         };
     }
+    /*
     resp["unix"] = std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
+    */
     return resp;
 }
 
-void Diagnostics::fn(struct mg_connection *c, int ev, void *ev_data) {
+void Diagnostics::handleUDPBroadcast(struct mg_connection *c, int ev, void *ev_data) {
     auto* th = static_cast<Diagnostics *>(c->fn_data);
 
     if (ev == MG_EV_READ) {
@@ -82,14 +84,14 @@ void Diagnostics::fn(struct mg_connection *c, int ev, void *ev_data) {
             if (c->recv.buf[0] == 255){
                 MG_INFO(("TOKAMAK START"));
                 using std::operator""ms;
-                std::this_thread::sleep_for(300ms);
+                std::this_thread::sleep_for(300ms); //guarantee wait for plasma
                 //th->laser.setState(req);
                 th->laser.stop();
             }else if (c->recv.buf[0] == 127){
                 //th->laser.setState(req);
                 th->laser.start();
                 using std::operator""ms;
-                MG_INFO(("TOKAMAK START -10s"));
+                MG_INFO(("TOKAMAK START -12s"));
             }else{
                 MG_INFO(("Unknown UDP packet", c->recv.buf[0]));
             }
@@ -104,18 +106,22 @@ Json Diagnostics::getConfigs() {
     std::filesystem::directory_entry configPath {Storage::dbRoot.path().string() + "config_cpp\\"};
     if(!configPath.exists()){
         return Json({
-                            {"ok", false},
-                            {"err", "hardcoded directory not found: d:\\data\\db\\config_cpp\\"}
-                    });
+                    {"ok", false},
+                    {"err", "hardcoded directory not found: d:\\data\\db\\config_cpp\\"}
+            });
     }
     Json resp({
-                            {"ok", true},
-                            {"files", {}}
-                    });
+                {"ok", true},
+                {"files", {}}
+        });
+
     for (auto const& dir_entry : std::filesystem::directory_iterator{configPath}) {
-        resp["files"].push_back(dir_entry.path().filename());
+        resp["files"].push_back(dir_entry.path().filename().string());
+        
         //std::cout << dir_entry.path() << '\n';
     }
+    std::sort(resp["files"].begin(), resp["files"].end(), std::greater<std::string>());
+
     return resp;
 }
 
@@ -156,7 +162,11 @@ Json Diagnostics::loadConfig(std::string filename) {
                       {"ok", true},
                       {"config", this->config}
               });
+    
+    caens.initialising = true;
     caens.init();
+    caens.initialising = false;
+    
     resp["status"] = this->status();
 
     return resp;
@@ -174,8 +184,9 @@ void Diagnostics::die() {
 }
 
 Json Diagnostics::status() {
-    std::cout << "check time in last states!" << std::endl;
+    //std::cout << "check time in last states!" << std::endl;
     Json resp = {
+            {"ok", true},
             {"storage", this->storage.status()},
             {"laser", this->laser.status()},
             {"coolant", this->coolant.status()},

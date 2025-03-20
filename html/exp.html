@@ -2,30 +2,411 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>TS exp</title>
+    <title>TS control</title>
     <link rel="icon" href="favicon.ico">
-    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        table, th, td {
+            border: 1px solid black;
+        }
+    </style>
 </head>
 <body>
 
-<script src="js/jquery.min.js"></script>
-<script src="js/bootstrap.min.js"></script>
-<script type="text/javascript" src="js/jquery.canvasjs.stock.min.js"></script>
-<link rel="stylesheet" href="js/bootstrap-select.min.css">
-<script type="text/javascript" src="js/bootstrap-select.min.js"></script>
+<script src="js/jquery.js"></script>
 
 <div>
+    <div>
+        <table>
+            <tr>
+                <td>
+                    <p>Configuration</p>
+                </td>
+                <td id="lag_main" style="background-color:red;">Lag [ms]
+                </td>
+              <td>
+                <label for="select_cpp_config">Configuration:</label><select id="select_cpp_config"></select>
+              </td>
+              <td>
+                <button type="button" onclick="LoadConfig()">Load</button>
+              </td>
+              <td>
+                <button type="button" onclick="console.log(aqc_configs);" disabled>print</button>
+              </td>
+              <td>
+                <label for="select_spectral">Spectral:</label><select id="select_spectral"></select>
+              </td>
+              <td>
+                <label for="select_abs">Abs.:</label><select id="select_abs"></select>
+              </td>
+              <td>
+                <label for="checkbox_isPlasma">is plasma?</label><input type="checkbox" id="checkbox_isPlasma" checked>
+                </td>
+                <td>
+                    <label for="shotn">№</label><output id="shotn"></output>
+                </td>
+            </tr>
 
+            <tr>
+                <td>
+                    <p>Diag.</p>
+                </td>
+                <td>
+                    <output id="lag_diag">999999</output>
+                </td>
+                <td>
+                    <output id="state_diag">Unknown</output>
+                </td>
+                <td>
+                    <output id="state_diag_OK" style="background-color:yellow;">OK/BAD</output>
+                </td>
+                <td>
+                    <label for="checkbox_auto_diag">Auto</label><input type="checkbox" id="checkbox_auto_diag">
+                </td>
+                <td>
+                    <button type="button" id="button_diag_arm">Arm</button>
+                </td>
+                <td>
+                    <button type="button" id="button_diag_disarm">Disarm</button>
+                </td>
+                <td>
+                    <button type="button" id="button_diag_trig_rough">Trig. rough</button>
+                </td>
+                <td>
+                    <button type="button" id="button_diag_trig_precise">Trig. precise</button>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <p>Fast ADC</p>
+                </td>
+                <td>
+                    <output id="lag_fast">999999</output>
+                </td>
+                <td>
+                    <output id="state_fast">Unknown</output>
+                </td>
+                <td id="state_fast_OK" style="background-color:yellow;">
+                </td>
+                <td>
+                    <label for="checkbox_auto_fast">Auto</label><input type="checkbox" id="checkbox_auto_fast" checked disabled>
+                </td>
+                <td>
+                    <button type="button" onclick="Request(
+                                                        {
+                                                            subsystem: 'fast',
+                                                            reqtype: 'arm',
+                                                            isPlasma: elements.isPlasma.checked
+                                                        }
+                                                        , function (resp) {
+                                                            if(!resp.ok){
+                                                                console.log(resp);
+                                                                alert(resp.err);
+                                                            }
+                                                        }
+                                                    );">Arm</button>
+                </td>
+                <td>
+                    <button type="button" onclick="Request(
+                        {
+                            subsystem: 'fast',
+                            reqtype: 'disarm'
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Disarm</button>
+                </td>
+                <td>
+                    <button type="button" onclick="Request(
+                        {
+                            subsystem: 'fast',
+                            reqtype: 'trigger',
+                            count: 1
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Trig.</button>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <p>Slow ADC</p>
+                </td>
+                <td>
+                    <output id="lag_slow">999999</output>
+                </td>
+                <td>
+                    <output id="state_slow">Unknown</output>
+                </td>
+                <td>
+                    <output id="state_slow_OK" style="background-color:yellow;">OK/BAD</output>
+                </td>
+                <td>
+                    <label for="checkbox_auto_slow">Auto</label><input type="checkbox" id="checkbox_auto_slow" checked disabled>
+                </td>
+                <td>
+                    <button type="button" id="button_slow_arm">Arm</button>
+                </td>
+                <td>
+                    <button type="button" id="button_slow_disarm">Disarm</button>
+                </td>
+                <td>
+                    <button type="button" id="button_slow_trig">Trig.</button>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <p>Ophir</p>
+                </td>
+                <td>
+                    <output id="lag_ophir">999999</output>
+                </td>
+                <td>
+                    <output id="state_ophir">Unknown</output>
+                </td>
+                <td>
+                    <output id="state_ophir_OK" style="background-color:yellow;">OK/BAD</output>
+                </td>
+                <td>
+                    <label for="checkbox_auto_ophir">Auto</label><input type="checkbox" id="checkbox_auto_ophir" checked disabled>
+                </td>
+                <td>
+                    <button type="button" id="button_ophir_arm">Arm</button>
+                </td>
+                <td>
+                    <button type="button" id="button_ophir_disarm">Disarm</button>
+                </td>
+            </tr>
+            
+            <tr>
+                <td>
+                    <p>Laser</p>
+                </td>
+                <td>
+                    <output id="lag_laser">999999</output>
+                </td>
+                <td>
+                    <output id="state_laser">Unknown</output>
+                </td>
+                <td>
+                    <output id="state_laser_OK" style="background-color:yellow;">OK/BAD</output>
+                </td>
+                <td>
+                    <label for="checkbox_auto_laser">Auto</label><input type="checkbox" id="checkbox_auto_laser" checked disabled>
+                </td>
+                <td>
+                    <button type="button" id="button_laser_on">Pump ON</button>
+                </td>
+                <td>
+                    <button type="button" id="button_laser_off">Pump Off</button>
+                </td>
+                <td>
+                    <button type="button" id="button_laser_trig" disabled>Trig.</button>
+                </td>
+                <td>
+                    <label for="state_laser_energy">Elas: </label><output id="state_laser_energy">???</output>
+                </td>
+            </tr>
+        
+            <tr>
+                <td colspan="8" >
+                    <p>Laser temperature oscillogram placeholder</p>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <p>DAC</p>
+                </td>
+                <td>
+                    <output id="state_dac">Unknown</output>
+                </td>
+                <td>
+                    <output id="state_dac_OK" style="background-color:yellow;">OK/BAD</output>
+                </td>
+                <td colspan="3">
+                    <label for="select_dac_gas">gas programm:</label><select id="select_dac_gas"></select>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <p>Periscope</p>
+                </td>
+                <td colspan="3">
+                    <p>diagram&buttons</p>
+                </td>
+                <td>
+                    <p>Lens</p>
+                </td>
+                <td colspan="3">
+                    <p>diagram&buttons</p>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <p>Crate</p>
+                </td>
+                <td colspan="3">
+                    <p>state&buttons</p>
+                </td>
+                <td>
+                    <p>T15</p>
+                </td>
+                <td colspan="3">
+                    <p>state&buttons</p>
+                </td>
+            </tr>
+        </table>
+            
+    </div>
+
+    
 </div>
 
 
 <script>
+    const elements = {
+        mainLag: document.getElementById("lag_main"),
+        diagLag: document.getElementById("lag_diag"),
+        isPlasma: document.getElementById("checkbox_isPlasma"),
+        shotn: document.getElementById("shotn"),
+        fastLag: document.getElementById("lag_fast"),
+        fastStatus: document.getElementById("state_fast"),
+        fastLED: document.getElementById("state_fast_OK")
+    };
+
+    Request = function (req, callback) {
+        $.post('/api', JSON.stringify(req), callback, 'json');
+    };
+
+    ConnectControls = function () {
+        //$('#button_load_cpp_config').on('click', this, LoadConfig);
+    };
+
+    GetConfigs = function(){
+        Request(
+            {
+                subsystem: 'diag',
+                reqtype: 'get_configs'
+            }
+            , function (resp) {
+                if(!resp.ok){
+                    console.log(resp);
+                    alert(resp.err);
+                }else{
+                    UpdateConfigSelects(resp);
+                }
+            }
+        );
+    };
+
+    LoadConfig = function(){
+        Request(
+            {
+                subsystem: 'diag',
+                reqtype: 'load_config',
+                filename: $('#select_cpp_config').val()
+            }
+            , function (resp) {
+                if(!resp.ok){
+                    console.log(resp);
+                    alert(resp.err);
+                }
+            }
+        );
+    };
+
+    UpdateConfigSelects = function(configs) {
+        let options = [];
+
+        options = [];
+        configs.files.forEach(entry => options.push("<option>" + entry + "</option>"));
+        $('#select_cpp_config').html(options);
+    };
+
+    UpdateStatus = function(status){
+        elements.mainLag.style.background = "green";
+
+        if(elements.isPlasma.checked){
+            elements.shotn.value = status.storage.shotn;
+        }else{
+            elements.shotn.value = status.storage.debug_shtn;
+        }
+        
+        //
+
+        elements.diagLag.value = status.elapsed;
+
+        // 
+
+        elements.fastLag.value = Date.now() - status.caens.timestamp;
+        if(status.caens.initialising){
+            elements.fastStatus.value = "Connecting... " + status.caens.links.length;
+            elements.fastLED.style.background = "yellow";
+        }else{
+            if(status.caens.ok){
+                if(status.caens.armed){
+                    elements.fastStatus.value = "Armed " + status.caens.curr;
+                    elements.fastLED.style.background = "green";
+                }else{
+                    if(status.storage.armed){
+                        elements.fastStatus.value = "Saving...";
+                        elements.fastLED.style.background = "purple";
+                    }else{
+                        elements.fastStatus.value = "Disarmed";
+                        elements.fastLED.style.background = "white";
+                    }
+                }
+            }else{
+                elements.fastStatus.value = "Error!";
+                elements.fastLED.style.background = "red";
+            }
+        }
+    }
+
     $(document).ready(
         function () {
-            //$('#tab1').load('js/configSection.html');
+            //ConnectControls();
+            GetConfigs();
+            
+            setInterval(
+                () => {
+                    let start = Date.now();
+                    elements.mainLag.style.background = "red";
+                    Request(
+                        {
+                            subsystem: 'diag',
+                            reqtype: 'status'
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                            }else{
+                                resp.elapsed = Date.now() - start;
+                                UpdateStatus(resp);
+                            }
+                        }
+                    );
+                },
+                500
+            );
+
+            console.log("init OK");
         }
     )
 </script>

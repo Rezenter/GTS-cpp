@@ -1,7 +1,5 @@
 #include "mongoose.h"
 
-
-
 #include "src/Diagnostics/Diagnostics.h"
 #include <csignal>
 #include <thread>
@@ -37,7 +35,9 @@ struct Task{
 static std::deque<Task> deque;
 
 static void threaded_reply(Task* task){
-    //std::cout << "Threaded reply" << std::endl;
+    SetThreadAffinityMask(GetCurrentThread(), 0b0001111000000000);
+    //std::cout << SetThreadAffinityMask(GetCurrentThread(), mask) << std::endl;
+    //std::cout << "reply thread affinity: " << ' ' << SetThreadAffinityMask(GetCurrentThread(), mask) << std::endl;
 
     Json payload({});
     try{
@@ -82,7 +82,7 @@ static void threaded_reply(Task* task){
     mg_wakeup(task->c->mgr, task->c->id, &ok, sizeof(ok));
 }
 
-static void fn(struct mg_connection *c, int ev, void *ev_data) {
+static void handleHTTP(struct mg_connection *c, int ev, void *ev_data) {
     if (ev == MG_EV_HTTP_MSG) {
         auto *hm = (struct mg_http_message *) ev_data;
         if (mg_match(hm->uri, mg_str("/api"), NULL)) {
@@ -97,6 +97,7 @@ static void fn(struct mg_connection *c, int ev, void *ev_data) {
                             request,
                     Json()
             );
+            
             deque.back().thread = new std::thread(threaded_reply, &deque.back());
         }else{
             char *path;
@@ -115,11 +116,11 @@ static void fn(struct mg_connection *c, int ev, void *ev_data) {
             delete[] path;
         }
     }else if(ev == MG_EV_WAKEUP){
-        for(auto i = deque.begin(); i != deque.end();){
+        for(auto i = deque.begin(); i != deque.end(); i++){
             if(i->c->id == c->id){
-                i->response["elapsed seconds"] = (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() - i->begin);
+                //i->response["elapsed seconds"] = (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() - i->begin);
                 mg_http_reply(c, 200, "Content-Type: application/json\r\n",
-                              "%s", i->response.dump().c_str());
+                              "%s", i->response.dump().c_str());           
                 i->thread->join();
                 delete i->thread;
                 deque.erase(i);
@@ -152,22 +153,24 @@ int main() {
         return 1;
     }
     cProcesses = cbNeeded / sizeof(DWORD);
+    size_t ok = 0;
     for (i = 0; i < cProcesses; i++ ){
         if( aProcesses[i] != 0 ){
             HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION |
                                            PROCESS_ALL_ACCESS,
                                            FALSE, aProcesses[i] );
-            std::cout  << aProcesses[i] << ' ' << SetProcessAffinityMask(hProcess, 0b1111000000000000) << std::endl;
+            ok += SetProcessAffinityMask(hProcess, 0b1110000000000000);
+            //std::cout  << aProcesses[i] << ' ' << SetProcessAffinityMask(hProcess, 0b1110000000000000) << std::endl;
             CloseHandle( hProcess );
         }
     }
-
-    std::cout << "Process affinity: " << ' ' << SetProcessAffinityMask(GetCurrentProcess(), 0b0000111111111111) << std::endl;
+    std::cout << "moved " << ok << "/" << cProcesses << std::endl;
+    std::cout << "Process affinity: " << ' ' << SetProcessAffinityMask(GetCurrentProcess(), 0b0001111111111111) << std::endl;
     std::cout << "process realtime: " << ' ' << SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS) << std::endl;
 
-    unsigned long long mask = 0b0000111100000000;
+    const unsigned long long mask = 0b0001111000000000;
     std::cout << SetThreadAffinityMask(GetCurrentThread(), mask) << std::endl;
-    std::cout << "Main thread affinity: " << ' ' << SetThreadAffinityMask(GetCurrentThread(), mask) << std::endl;
+    std::cout << "Main thread " << GetCurrentThreadId() << " , affinity: " << ' ' << SetThreadAffinityMask(GetCurrentThread(), mask) << std::endl;
 
 
 
@@ -175,14 +178,14 @@ int main() {
     mg_mgr_init(&mgr);                                      // Init manager
     diag.setMgr(&mgr);
 
-    mg_http_listen(&mgr, "http://0.0.0.0:80", fn, NULL);  // api/web
-    mg_listen(&mgr, "udp://0.0.0.0:8888", diag.fn, &diag); //udp start/stop
+    mg_http_listen(&mgr, "http://0.0.0.0:80", handleHTTP, NULL);  // api/web
+    mg_listen(&mgr, "udp://0.0.0.0:8888", diag.handleUDPBroadcast, &diag); //udp start/stop
     mg_listen(&mgr, "udp://0.0.0.0:4001", Laser330::cfn, &diag.laser); //udp laser
 
     mg_wakeup_init(&mgr);  // Initialise wakeup socket pair
     std::cout << "Server alive" << std::endl;
     while(s_signo == 0) {
-        mg_mgr_poll(&mgr, 0);
+        mg_mgr_poll(&mgr, 1);
     }
     std::cout << "Stop poll" << std::endl;
     diag.die();

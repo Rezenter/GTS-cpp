@@ -32,7 +32,9 @@ public:
 private:
     //inline const static std::filesystem::directory_entry plasmaShotnPath   {R"(z:\SHOTN.txt)"};
     //inline const static std::filesystem::directory_entry plasmaShotnPath   {R"(\\172.16.12.28\Data\SHOTN.txt)"};
-    inline const static std::filesystem::directory_entry plasmaShotnPath   {R"(\\172.16.12.70\shared\SHOTN.txt)"};
+    //inline const static std::filesystem::directory_entry plasmaShotnPath   {R"(\\172.16.12.70\shared\SHOTN.txt)"};
+    inline const static std::filesystem::directory_entry plasmaShotnPath   {R"(c:\shared\SHOTN.txt)"};
+
     inline const static std::filesystem::directory_entry debugPath    {dbRoot.path().string() + "debug\\"};
     inline const static std::filesystem::directory_entry plasmaPath    {dbRoot.path().string() + "plasma\\"};
 

@@ -62,6 +62,7 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
                     count++;
                 }
                 mutex.unlock();
+
                 std::this_thread::sleep_for(200ms);
             }
             //std::cout << "laser worker stopping due to request" << std::endl;
@@ -257,6 +258,7 @@ void Laser330::cfn(struct mg_connection *c, int ev, void *ev_data) {
 
             if(th->queue.top().bestBefore < std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()){
                 MG_INFO(("LAG"));
+                //std::cout << " lag from " << GetCurrentThreadId() << std::endl;
                 //int count = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
                 if(th->queue.top().request.starts_with('S')){
                     th->queue.emplace(220,

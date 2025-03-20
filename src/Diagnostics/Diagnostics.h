@@ -36,7 +36,7 @@ public:
     Storage storage;
     AllBoards caens;
     Diagnostics(): caens(this), storage(this), mgr{nullptr}{};
-    static void fn(struct mg_connection *c, int ev, void *ev_data);
+    static void handleUDPBroadcast(struct mg_connection *c, int ev, void *ev_data);
     void setMgr(mg_mgr *mgr){
         this->mgr = mgr;
         laser.setMgr(mgr);
