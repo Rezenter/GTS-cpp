@@ -34,6 +34,66 @@ Json Diagnostics::handleRequest(Json& payload){
                     }
                 }else if(payload.at("reqtype") == "status"){
                        resp = this->status();
+                }else if(payload.at("reqtype") == "auto"){
+                    if(payload.contains("state")){
+                        this->fullAuto = payload["state"];
+                        resp = {
+                            {"ok", true}
+                        };
+                    }else{
+                        resp = {
+                            {"ok", false},
+                            {"err", "state not found"}
+                        };
+                    }   
+                }else if(payload.at("reqtype") == "isPlasma"){
+                    if(payload.contains("state")){
+                        this->isPlasma = payload["state"];
+                        resp = {
+                            {"ok", true}
+                        };
+                    }else{
+                        resp = {
+                            {"ok", false},
+                            {"err", "state not found"}
+                        };
+                    }   
+                }else if(payload.at("reqtype") == "autoFast"){
+                    if(payload.contains("state")){
+                        this->fastAuto = payload["state"];
+                        resp = {
+                            {"ok", true}
+                        };
+                    }else{
+                        resp = {
+                            {"ok", false},
+                            {"err", "state not found"}
+                        };
+                    }   
+                }else if(payload.at("reqtype") == "autoLasOn"){
+                    if(payload.contains("state")){
+                        this->lasAutoOn = payload["state"];
+                        resp = {
+                            {"ok", true}
+                        };
+                    }else{
+                        resp = {
+                            {"ok", false},
+                            {"err", "state not found"}
+                        };
+                    }   
+                }else if(payload.at("reqtype") == "autoLasOff"){
+                    if(payload.contains("state")){
+                        this->lasAutoOff = payload["state"];
+                        resp = {
+                            {"ok", true}
+                        };
+                    }else{
+                        resp = {
+                            {"ok", false},
+                            {"err", "state not found"}
+                        };
+                    }   
                 }else{
                     resp = {
                             {"ok", false},
@@ -82,15 +142,22 @@ void Diagnostics::handleUDPBroadcast(struct mg_connection *c, int ev, void *ev_d
             MG_INFO(("ignore long packet"));
         }else{
             if (c->recv.buf[0] == 255){
+                if(th->lasAutoOff){
+                    using std::operator""ms;
+                    std::this_thread::sleep_for(300ms); //guarantee wait for plasma
+                    th->laser.stop();
+                }
+                
+                if(th->fullAuto){
+                    th->disarm();
+                }
+
                 MG_INFO(("TOKAMAK START"));
-                using std::operator""ms;
-                std::this_thread::sleep_for(300ms); //guarantee wait for plasma
-                //th->laser.setState(req);
-                th->laser.stop();
             }else if (c->recv.buf[0] == 127){
-                //th->laser.setState(req);
-                th->laser.start();
-                using std::operator""ms;
+                if(th->fullAuto){
+                    th->arm();
+                }
+
                 MG_INFO(("TOKAMAK START -12s"));
             }else{
                 MG_INFO(("Unknown UDP packet", c->recv.buf[0]));
@@ -99,6 +166,24 @@ void Diagnostics::handleUDPBroadcast(struct mg_connection *c, int ev, void *ev_d
         c->recv.len = 0;
     }else if (ev != MG_EV_POLL){
         MG_INFO(("UDP:8888 unhandled event"));
+    }
+}
+
+void Diagnostics::arm(){
+    if(this->lasAutoOn){
+        this->laser.start();
+    }
+    if(this->fastAuto){
+        this->caens.arm();
+    }
+}
+
+void Diagnostics::disarm(){
+    if(this->lasAutoOff){
+        this->laser.stop();
+    }
+    if(this->fastAuto){
+        this->caens.disarm();
     }
 }
 
@@ -190,7 +275,15 @@ Json Diagnostics::status() {
             {"storage", this->storage.status()},
             {"laser", this->laser.status()},
             {"coolant", this->coolant.status()},
-            {"caens", this->caens.status()}
+            {"caens", this->caens.status()},
+            {"auto", {
+                    {"isPlasma", this->isPlasma},
+                    {"full", this->fullAuto},
+                    {"fast", this->fastAuto},
+                    {"lasOn", this->lasAutoOn},
+                    {"lasOff", this->lasAutoOff}
+                }
+            }
     };
     return resp;
 }

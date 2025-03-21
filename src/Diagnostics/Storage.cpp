@@ -56,7 +56,7 @@ Json Storage::status() {
     return resp;
 }
 
-void Storage::arm(bool isPlasma){
+void Storage::arm(){
     if(this->armed){
         std::cout << "attempt to arm already armed storage" << std::endl;
         return;
@@ -66,7 +66,7 @@ void Storage::arm(bool isPlasma){
         return;
     }
 
-    this->isPlasma = isPlasma;
+    this->isPlasma = this->diag->isPlasma;
     if(isPlasma){
         this->currentPath = Storage::plasmaPath;
     }else{

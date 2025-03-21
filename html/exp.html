@@ -42,7 +42,19 @@
                 <label for="select_abs">Abs.:</label><select id="select_abs"></select>
               </td>
               <td>
-                <label for="checkbox_isPlasma">is plasma?</label><input type="checkbox" id="checkbox_isPlasma" checked>
+                <label for="checkbox_isPlasma"  onclick="Request(
+                    {
+                        subsystem: 'diag',
+                        reqtype: 'isPlasma',
+                        state: !elements.isPlasma.checked
+                    }
+                    , function (resp) {
+                        if(!resp.ok){
+                            console.log(resp);
+                            alert(resp.err);
+                        }
+                    }
+                );">is plasma?</label><input type="checkbox" id="checkbox_isPlasma" checked>
                 </td>
                 <td>
                     <label for="shotn">№</label><output id="shotn"></output>
@@ -63,7 +75,19 @@
                     <output id="state_diag_OK" style="background-color:yellow;">OK/BAD</output>
                 </td>
                 <td>
-                    <label for="checkbox_auto_diag">Auto</label><input type="checkbox" id="checkbox_auto_diag">
+                    <label for="checkbox_auto_diag" onclick="Request(
+                        {
+                            subsystem: 'diag',
+                            reqtype: 'auto',
+                            state: !elements.autoDiag.checked
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Auto</label><input type="checkbox" id="checkbox_auto_diag">
                 </td>
                 <td>
                     <button type="button" id="button_diag_arm">Arm</button>
@@ -92,14 +116,25 @@
                 <td id="state_fast_OK" style="background-color:yellow;">
                 </td>
                 <td>
-                    <label for="checkbox_auto_fast">Auto</label><input type="checkbox" id="checkbox_auto_fast" checked disabled>
+                    <label for="checkbox_auto_fast"   onclick="Request(
+                        {
+                            subsystem: 'diag',
+                            reqtype: 'autoFast',
+                            state: !elements.autoFast.checked
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Auto</label><input type="checkbox" id="checkbox_auto_fast" checked disabled>
                 </td>
                 <td>
-                    <button type="button" onclick="Request(
+                    <button type="button" id="button_fast_arm" onclick="Request(
                                                         {
                                                             subsystem: 'fast',
-                                                            reqtype: 'arm',
-                                                            isPlasma: elements.isPlasma.checked
+                                                            reqtype: 'arm'
                                                         }
                                                         , function (resp) {
                                                             if(!resp.ok){
@@ -107,10 +142,10 @@
                                                                 alert(resp.err);
                                                             }
                                                         }
-                                                    );">Arm</button>
+                                                    );" disabled>Arm</button>
                 </td>
                 <td>
-                    <button type="button" onclick="Request(
+                    <button type="button" id="button_fast_disarm" onclick="Request(
                         {
                             subsystem: 'fast',
                             reqtype: 'disarm'
@@ -121,10 +156,10 @@
                                 alert(resp.err);
                             }
                         }
-                    );">Disarm</button>
+                    );" disabled>Disarm</button>
                 </td>
                 <td>
-                    <button type="button" onclick="Request(
+                    <button type="button"  id="button_fast_trig"  onclick="Request(
                         {
                             subsystem: 'fast',
                             reqtype: 'trigger',
@@ -136,7 +171,7 @@
                                 alert(resp.err);
                             }
                         }
-                    );">Trig.</button>
+                    );" disabled>Trig.</button>
                 </td>
             </tr>
 
@@ -192,35 +227,86 @@
             </tr>
             
             <tr>
-                <td>
+                <td rowspan="2">
                     <p>Laser</p>
                 </td>
-                <td>
+                <td rowspan="2">
                     <output id="lag_laser">999999</output>
                 </td>
-                <td>
+                <td rowspan="2">
                     <output id="state_laser">Unknown</output>
                 </td>
-                <td>
-                    <output id="state_laser_OK" style="background-color:yellow;">OK/BAD</output>
+                <td  rowspan="2" id="state_laser_OK" style="background-color:yellow;">
                 </td>
                 <td>
-                    <label for="checkbox_auto_laser">Auto</label><input type="checkbox" id="checkbox_auto_laser" checked disabled>
+                    <label for="checkbox_auto_laser_on" onclick="Request(
+                        {
+                            subsystem: 'diag',
+                            reqtype: 'autoLasOn',
+                            state: !elements.autoLasOn.checked
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Auto ON</label><input type="checkbox" id="checkbox_auto_laser_on" checked disabled>
                 </td>
-                <td>
-                    <button type="button" id="button_laser_on">Pump ON</button>
+                <td rowspan="2">
+                    <button type="button" id="button_laser_on" onclick="Request(
+                        {
+                            subsystem: 'laser330',
+                            reqtype: 'setState',
+                            target: 3
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );" disabled>Pump ON</button>
                 </td>
-                <td>
-                    <button type="button" id="button_laser_off">Pump Off</button>
+                <td rowspan="2">
+                    <button type="button" id="button_laser_off" onclick="Request(
+                        {
+                            subsystem: 'laser330',
+                            reqtype: 'setState',
+                            target: 1
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Pump Off</button>
                 </td>
-                <td>
+                <td rowspan="2">
                     <button type="button" id="button_laser_trig" disabled>Trig.</button>
                 </td>
-                <td>
+                <td rowspan="2">
                     <label for="state_laser_energy">Elas: </label><output id="state_laser_energy">???</output>
                 </td>
             </tr>
-        
+            <tr>
+                <td>
+                    <label for="checkbox_auto_laser_off" onclick="Request(
+                        {
+                            subsystem: 'diag',
+                            reqtype: 'autoLasOff',
+                            state: !elements.autoLasOff.checked
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Auto Off</label><input type="checkbox" id="checkbox_auto_laser_off" checked>
+                </td>
+            </tr>
             <tr>
                 <td colspan="8" >
                     <p>Laser temperature oscillogram placeholder</p>
@@ -287,7 +373,19 @@
         shotn: document.getElementById("shotn"),
         fastLag: document.getElementById("lag_fast"),
         fastStatus: document.getElementById("state_fast"),
-        fastLED: document.getElementById("state_fast_OK")
+        fastLED: document.getElementById("state_fast_OK"),
+        fastArm: document.getElementById("button_fast_arm"),
+        fastDisarm: document.getElementById("button_fast_disarm"),
+        fastTrig: document.getElementById("button_fast_trig"),
+        lasLag: document.getElementById("lag_laser"),
+        lasStatus: document.getElementById("state_laser"),
+        lasLED: document.getElementById("state_laser_OK"),
+        lasArm: document.getElementById("button_laser_on"),
+        lasEnergy: document.getElementById("state_laser_energy"),
+        autoDiag: document.getElementById("checkbox_auto_diag"),
+        autoFast: document.getElementById("checkbox_auto_fast"),
+        autoLasOn: document.getElementById("checkbox_auto_laser_on"),
+        autoLasOff: document.getElementById("checkbox_auto_laser_off")
     };
 
     Request = function (req, callback) {
@@ -358,25 +456,102 @@
         if(status.caens.initialising){
             elements.fastStatus.value = "Connecting... " + status.caens.links.length;
             elements.fastLED.style.background = "yellow";
+            elements.fastArm.disabled = true;
+            elements.fastDisarm.disabled = true;
+            elements.fastTrig.disabled = true;
         }else{
             if(status.caens.ok){
                 if(status.caens.armed){
                     elements.fastStatus.value = "Armed " + status.caens.curr;
                     elements.fastLED.style.background = "green";
+                    elements.fastArm.disabled = true;
+                    elements.fastDisarm.disabled = false;
+                    elements.fastTrig.disabled = false;
                 }else{
+                    elements.fastDisarm.disabled = true;
+                    elements.fastTrig.disabled = true;
                     if(status.storage.armed){
                         elements.fastStatus.value = "Saving...";
                         elements.fastLED.style.background = "purple";
                     }else{
                         elements.fastStatus.value = "Disarmed";
                         elements.fastLED.style.background = "white";
+                        elements.fastArm.disabled = false;
                     }
                 }
             }else{
                 elements.fastStatus.value = "Error!";
                 elements.fastLED.style.background = "red";
+                elements.fastArm.disabled = true;
+                elements.fastDisarm.disabled = true;
+                elements.fastTrig.disabled = true;
             }
         }
+
+        //
+
+        elements.lasLag.value = Date.now() - status.laser.timestamp_ms;
+
+        elements.lasLED.innerHTML = '';
+        if(status.laser.flags[2]){
+            elements.lasLED.innerHTML += 'Sync! ';
+        }
+        if(!status.laser.flags[14]){
+            elements.lasLED.innerHTML += 'Ctl! ';
+        }
+        if(!status.laser.flags[15]){
+            elements.lasLED.innerHTML += 'Lock!';
+        }
+
+
+        if(status.laser.ok){
+            if(status.laser.state === 0){
+                elements.lasStatus.value = "Power Off ";
+                elements.lasLED.style.background = "blue";
+                elements.lasArm.disabled = true;
+            }else if(status.laser.state === 1){
+                elements.lasStatus.value = "Idle ";
+                elements.lasLED.style.background = "white";
+                elements.lasArm.disabled = false;
+            }else if(status.laser.state === 2){
+                elements.lasStatus.value = "Warm-up... ";
+                elements.lasLED.style.background = "yellow";
+                elements.lasArm.disabled = true;
+            }else if(status.laser.state === 3){
+                elements.lasStatus.value = "Ready for trig. ";
+                elements.lasLED.style.background = "green";
+                elements.lasArm.disabled = true;
+            }else if(status.laser.state === 4){
+                elements.lasStatus.value = "Firing... ";
+                elements.lasLED.style.background = "purple";
+                elements.lasArm.disabled = true;
+            }else{
+                elements.lasStatus.value = "Error! ";
+                elements.lasLED.style.background = "red";
+                elements.lasArm.disabled = true;
+                
+            }
+        }else{
+            elements.lasStatus.value = "Error! ";
+            elements.lasLED.style.background = "red";
+            elements.lasArm.disabled = true;
+        }
+
+        if(status.laser.timeout < 1000000000){
+            elements.lasStatus.value += (status.laser.timeout / 60).toFixed(0) + ':' + (status.laser.timeout % 60).toFixed(0);
+        }
+
+        elements.lasEnergy.value = status.laser.delayAmp + " / " + status.laser.delayMO;
+
+        //
+        elements.isPlasma.checked = status.auto.isPlasma;
+        elements.autoDiag.checked = status.auto.full;
+        elements.autoFast.checked = status.auto.fast;
+        elements.autoLasOn.checked = status.auto.lasOn;
+        elements.autoLasOff.checked = status.auto.lasOff;
+
+        elements.autoFast.disabled = !status.auto.full;
+        elements.autoLasOn.disabled = !status.auto.full;
     }
 
     $(document).ready(

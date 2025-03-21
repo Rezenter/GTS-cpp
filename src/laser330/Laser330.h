@@ -28,15 +28,15 @@ private:
     struct mg_connection *curr_c;
 
     struct State{
-        long long int timestamp_ms;
-        long long int timeout_ms;
-        uint16_t bits;
-        uint16_t delayMO;
-        uint16_t delayAmp;
-        uint8_t state;
+        long long int timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        long long int timeout_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        uint16_t bits = 0;
+        uint16_t delayMO = 999;
+        uint16_t delayAmp = 999;
+        uint8_t state = 255;
 
     };
-    std::deque<State> states;
+    std::deque<State> states = {State()}; //to init time
 
     struct Request{
         uint8_t priority;
@@ -59,7 +59,6 @@ private:
     std::priority_queue<Request> queue;
 
     static void reconnectSocket(void *arg);
-
 
     long long int lastTimestamp_ms;
     Json setState(Json& req);

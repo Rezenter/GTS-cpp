@@ -31,7 +31,16 @@ private:
     Json loadConfig(std::string filename);
     Json status();
 
+    void arm();
+    void disarm();
+    
+    bool fullAuto = false;
+    bool fastAuto = false;
+    bool lasAutoOn = false;
+    bool lasAutoOff = true;
+
 public:
+    bool isPlasma = true;
     Laser330 laser;
     Storage storage;
     AllBoards caens;

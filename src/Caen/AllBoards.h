@@ -33,19 +33,19 @@ public:
     Json status();
     std::vector<Link*> links;
     bool initialising = false;
+    void arm();
+    void disarm();
 
 private:
     std::jthread worker;
     Diagnostics* diag;
-    void arm(bool isPlasma=true);
     void trigger(size_t count=1);
-    void disarm();
     bool armed = false;
     bool initialised = false;
     SOCKET sockfd;
     struct sockaddr_in servaddr;
     Buffer buffer;
-    std::atomic<size_t> current_ind = 0;
+    std::atomic<unsigned short> current_ind = 0;
 };
 
 

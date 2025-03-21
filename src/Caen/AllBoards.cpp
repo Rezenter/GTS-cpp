@@ -19,6 +19,7 @@ Json AllBoards::init() {
             this->links.pop_back();
         }       
 
+        std::cout << "Vector size =  " << this->links.size() << std::endl;
         std::cout << "ADD CLOSING OF RT SOCKET!" << std::endl;
         
     }
@@ -211,11 +212,7 @@ Json AllBoards::handleRequest(Json &req) {
             } else {
                 this->diag->config["default_calibrations"] = {};
             }
-            bool isPlasma = true;
-            if (req.contains("isPlasma")) {
-                isPlasma = req["isPlasma"];
-            }
-            this->arm(isPlasma);
+            this->arm();
             return this->status();
         }else if(req.at("reqtype") == "disarm"){
             this->disarm();
@@ -255,14 +252,15 @@ Json AllBoards::status() {
             {"ok", this->initialised},
             {"links", {}},
             {"armed", this->armed},
-            {"init", this->initialised},
             {"initialising", this->initialising},
-            {"timestamp", 0},
+            {"timestamp", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()},
             {"curr", this->current_ind.load()}
     };
     for(auto& link: this->links){
         Json linkStatus = link->status();
-        resp["timestamp"] = max(resp["timestamp"], linkStatus["timestamp"]);
+        if(link->nodes.size()){
+            resp["timestamp"] = max(resp["timestamp"], linkStatus["timestamp"]);
+        }
         resp["links"].push_back(linkStatus);
         if(!linkStatus["ok"]){
             resp["ok"] = false;
@@ -272,7 +270,7 @@ Json AllBoards::status() {
     return resp;
 }
 
-void AllBoards::arm(bool isPlasma) {
+void AllBoards::arm() {
     if(this->armed){
         std::cout << "CAENs arm command ignored: already armed" << std::endl;
         return;
@@ -281,7 +279,7 @@ void AllBoards::arm(bool isPlasma) {
         std::cout << "CAENs arm command ignored: storage not ready" << std::endl;
         return;
     }
-    this->diag->storage.arm(isPlasma);
+    this->diag->storage.arm();
     for(auto& link: this->links){
         link->arm();
     }
@@ -300,20 +298,24 @@ void AllBoards::arm(bool isPlasma) {
         //std::cout << "AllBoards thread: " << SetThreadAffinityMask(GetCurrentThread(), mask) << " " << GetCurrentThreadId() << std::endl;
 
         bool stopped = false;
+        unsigned short ready = USHRT_MAX;
         while(!(stoken.stop_requested() or stopped)){
-            bool ready = true;
+            ready = USHRT_MAX;
             stopped = true;
+
             for(auto& link: links){
                 for(auto& node: link->nodes){
-                    ready &= (node->evCount > current.load());
+                    ready = min(ready, node->evCount.load());
+                    //ready &= (node->evCount > current.load());
                 }
                 stopped &= !link->armed;
             }
-            if(ready){
-                //calc Te, ne, send UDP
+            
+            while(ready > current.load()){
+                // send UDP
 
                 //check once
-                std::cout << "ready event " << current.load() << std::endl;
+                //std::cout << "ready event " << current.load() << std::endl;
                 
                 /*
                 sendto(sockfd, buffer.chars, 4,

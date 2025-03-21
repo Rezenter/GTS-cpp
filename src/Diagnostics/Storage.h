@@ -25,7 +25,7 @@ public:
     inline const static std::filesystem::directory_entry dbRoot {R"(d:\data\db\)"};
     Json status();
     void save();
-    void arm(bool isPlasma=true);
+    void arm();
     static std::string shotn(bool isPlasma=true);
     bool armed = false;
 
