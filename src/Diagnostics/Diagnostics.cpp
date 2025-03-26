@@ -6,8 +6,6 @@
 #include <chrono>
 #include <fstream>
 
-
-
 using Json = nlohmann::json;
 
 Json Diagnostics::handleRequest(Json& payload){
@@ -34,6 +32,15 @@ Json Diagnostics::handleRequest(Json& payload){
                     }
                 }else if(payload.at("reqtype") == "status"){
                        resp = this->status();
+                }else if(payload.at("reqtype") == "arm"){
+                    this->arm();
+                    resp = this->status();
+                }else if(payload.at("reqtype") == "disarm"){
+                    this->disarm();
+                    resp = this->status();
+                }else if(payload.at("reqtype") == "trig"){
+                    this->trig();
+                    resp = this->status();
                 }else if(payload.at("reqtype") == "auto"){
                     if(payload.contains("state")){
                         this->fullAuto = payload["state"];
@@ -112,6 +119,8 @@ Json Diagnostics::handleRequest(Json& payload){
             resp = this->coolant.handleRequest(payload);
         }else if(payload.at("subsystem") == "fast"){
             resp = this->caens.handleRequest(payload);
+        }else if(payload.at("subsystem") == "ophir"){
+            //resp = this->ophir.handleRequest(payload);
         }else{
             resp = {
                     {"ok", false},
@@ -170,21 +179,104 @@ void Diagnostics::handleUDPBroadcast(struct mg_connection *c, int ev, void *ev_d
 }
 
 void Diagnostics::arm(){
+    if(this->storage.armed){
+        std::cout << "arm command ignored: storage not ready" << std::endl;
+        return;
+    }
+    this->storage.arm();
+
     if(this->lasAutoOn){
         this->laser.start();
     }
+
+
     if(this->fastAuto){
         this->caens.arm();
     }
+    this->savedFast = !this->fastAuto;
+
+    if(this->ophirAuto){
+        //this->ophir.arm();
+    }
+    this->savedOphir = !this->ophirAuto;
+
+    //expecting save thread?
+    this->saving = std::jthread([th=this](std::stop_token stoken){
+        bool done = false;
+        while(!stoken.stop_requested() && !done){
+
+            done = true;
+            done &= th->savedFast;
+            done &= th->savedOphir;
+            //savedOphir, savedelse...
+
+            /*
+            std::cout << "cont: " << done << std::endl;
+            std::cout << "caens: " << th->savedFast << std::endl;
+            std::cout << "Ophir: " << th->savedOphir << std::endl;
+*/
+
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(100ms);
+        }
+        std::cout << "saving loop exit" << std::endl;
+        if(done){
+            std::cout << "all saved" << std::endl;
+        }else{
+            std::cout << "WARNING! saving deadline missed, some data is not saved" << std::endl;
+            std::cout << "caens: " << th->savedFast << std::endl;
+            std::cout << "Ophir: " << th->savedOphir << std::endl;
+        }
+        th->storage.disarm();
+    });
 }
 
 void Diagnostics::disarm(){
+   
     if(this->lasAutoOff){
         this->laser.stop();
     }
     if(this->fastAuto){
         this->caens.disarm();
     }
+
+    //save laser status
+    //save config
+
+//collect data:
+        //ophir
+        //slow
+        //status
+        //config
+        //datetime
+
+    //is_plasma?
+    //calculate folder
+    //save data
+
+    //wait for all expected saves
+
+
+    const auto start = std::chrono::system_clock::now();
+    while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() <= 5000){
+        if(!this->storage.armed){
+            std::cout << "saving loop exited before deadline" << std::endl;
+            break;
+        }
+
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(100ms);
+    }
+
+    this->saving.request_stop();
+    this->saving.join();
+}
+
+void Diagnostics::trig(){
+    // trig laser or fastADC
+    //trig slow
+
+    this->disarm();
 }
 
 Json Diagnostics::getConfigs() {
@@ -248,9 +340,16 @@ Json Diagnostics::loadConfig(std::string filename) {
                       {"config", this->config}
               });
     
-    caens.initialising = true;
-    caens.init();
-    caens.initialising = false;
+    /*
+    std::jthread ophirThread = std::jthread([th=this](std::stop_token stoken){
+        SetThreadAffinityMask(GetCurrentThread(), 1 << 9);
+        Ophir ophir(th);
+        ophir.connect();
+    });
+*/
+    this->caens.initialising = true;
+    this->caens.init();
+    this->caens.initialising = false;
     
     resp["status"] = this->status();
 
@@ -276,6 +375,7 @@ Json Diagnostics::status() {
             {"laser", this->laser.status()},
             {"coolant", this->coolant.status()},
             {"caens", this->caens.status()},
+            //{"ophir", this->ophir.status()},
             {"auto", {
                     {"isPlasma", this->isPlasma},
                     {"full", this->fullAuto},

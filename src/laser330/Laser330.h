@@ -5,6 +5,7 @@
 #ifndef GTS_CORE_LASER330_H
 #define GTS_CORE_LASER330_H
 
+#include <WinSock2.h>
 #include "mongoose.h"
 #include "string"
 #include "json.hpp"

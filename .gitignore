@@ -31,11 +31,13 @@
 *.app
 
 #folders
+/.idea/
 /.idea/.gitignore
 /.idea/GTS-cpp.iml
 /.idea/misc.xml
 /.idea/modules.xml
 /.idea/vcs.xml
+/cmake-build-debug/
 /cmake-build-debug/.cmake/api/v1/query/cache-v2
 /cmake-build-debug/.cmake/api/v1/query/cmakeFiles-v1
 /cmake-build-debug/.cmake/api/v1/query/codemodel-v2
@@ -72,6 +74,7 @@
 /cmake-build-release/
 /OfficialDemo/
 .idea/.name
+build/
 build/ALL_BUILD.vcxproj
 build/ALL_BUILD.vcxproj.filters
 build/cmake_install.cmake
@@ -297,3 +300,19 @@ build/x64/Release/ZERO_CHECK/ZERO_CHECK.tlog/CustomBuild.read.1.tlog
 build/x64/Release/ZERO_CHECK/ZERO_CHECK.tlog/CustomBuild.write.1.tlog
 build/x64/Release/ZERO_CHECK/ZERO_CHECK.tlog/ZERO_CHECK.lastbuildstate
 build/.cmake/api/v1/reply/index-2025-03-21T10-38-58-0920.json
+build/.cmake/api/v1/reply/codemodel-v2-b41f3d4a811b05b0c7a6.json
+build/.cmake/api/v1/reply/index-2025-03-24T13-36-47-0488.json
+build/.cmake/api/v1/reply/target-GTS-core-Debug-d19267efbc7c4a4768dc.json
+build/.cmake/api/v1/reply/target-GTS-core-MinSizeRel-9b1a827e1230149980cd.json
+build/.cmake/api/v1/reply/target-GTS-core-Release-9b8fa29de0209f706aee.json
+build/.cmake/api/v1/reply/target-GTS-core-RelWithDebInfo-ce64b585b9befaa169d5.json
+build/.cmake/api/v1/reply/target-test1-Debug-e6cf2c7aeb3bb1f9b53d.json
+build/.cmake/api/v1/reply/target-test1-MinSizeRel-086baf4c3299b6e177a4.json
+build/.cmake/api/v1/reply/target-test1-Release-7b09cf9f161ec331d9d0.json
+build/.cmake/api/v1/reply/target-test1-RelWithDebInfo-5a64f2cf40ee34d3246b.json
+build/.cmake/api/v1/reply/target-testOphir-Debug-0a3b5a979dc7d72bc9f2.json
+build/.cmake/api/v1/reply/target-testOphir-MinSizeRel-7d82d142717b002f192f.json
+build/.cmake/api/v1/reply/target-testOphir-Release-93f985f4ec5edde7a024.json
+build/.cmake/api/v1/reply/target-testOphir-RelWithDebInfo-b8af796780a9addf3880.json
+build/GTS-core.dir/Release/OphirLMMeasurement.tlh
+build/GTS-core.dir/Release/OphirLMMeasurement.tli

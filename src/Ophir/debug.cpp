@@ -1,6 +1,7 @@
 // Sample code for using the OphirLMMeasurement.CoLMMeasurement COM object C++ wrapper.
 // See OphirLMMeasurement.h for more details.
 
+#include <WinSock2.h>
 #include "OphirLMMeasurement.h"
 
 #include <iostream>
@@ -50,16 +51,18 @@ int main()
 		
 		if (serialNumbers.size() > 0){
 			OphirLM.OpenUSBDevice(serialNumbers[0].c_str(), hDevice);
+			std::wcout << serialNumbers[0].c_str() << std::endl; //955794
 
-			OphirLM.GetDeviceInfo(hDevice, deviceName, romVersion, serialNumber);
+			OphirLM.GetDeviceInfo(hDevice, deviceName, romVersion, serialNumber); // Pulsar
 			std::wcout << L"Device Name:   " << deviceName << L" \n";
 
-			OphirLM.GetSensorInfo(hDevice, channel, headSN, headType, headName);
+			OphirLM.GetSensorInfo(hDevice, channel, headSN, headType, headName); // PE50-DIF-C
 			std::wcout << L"Head name:          " << headName << L" \n";
 			std::wcout << L"Head type:          " << headType << L" \n";
 
-
 			//start measuring on first device
+			OphirLM.ConfigureStreamMode(hDevice, channel, 2, 1); // disable buffering
+
            	OphirLM.RegisterPlugAndPlay(PlugAndPlayCallback);	
 			OphirLM.RegisterDataReady(DataReadyCallback);
 			OphirLM.StartStream(hDevice, channel);

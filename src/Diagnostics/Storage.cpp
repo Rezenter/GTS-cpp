@@ -67,13 +67,13 @@ void Storage::arm(){
     }
 
     this->isPlasma = this->diag->isPlasma;
-    if(isPlasma){
+    if(this->isPlasma){
         this->currentPath = Storage::plasmaPath;
     }else{
         this->currentPath = Storage::debugPath;
     }
 
-    std::string shotn = Storage::shotn(isPlasma);
+    std::string shotn = Storage::shotn(this->isPlasma);
     std::stringstream ss;
     ss << std::setw(5) << std::setfill('0') << shotn;
 
@@ -98,7 +98,7 @@ void Storage::arm(){
     this->armed = true;
 }
 
-void Storage::save() {
+void Storage::saveFast() {
     if(this->armed){
         std::ofstream outFile;
         outFile.open(this->currentPath.path().string() + "header.json");
@@ -128,10 +128,16 @@ void Storage::save() {
                 outFile.close();
             }
         }
+        this->diag->savedFast = true;
+        std::cout << "CAEN files written: " << this->currentPath.path().string() << std::endl;
+    }else{
+        std::cout << "attempt to save not armed storage" << std::endl;
+        return;
+    }
+}
 
-
-        std::cout << "Files written: " << this->currentPath.path().string() << std::endl;
-
+void Storage::disarm(){
+    if(this->armed){
         this->armed = false;
         if(!this->isPlasma){
             int shotn = std::stoi(Storage::shotn(false)) + 1;
@@ -143,9 +149,6 @@ void Storage::save() {
             //file.write(ss, 5);
             file.close();
         }
-    }else{
-        std::cout << "attempt to save not armed storage" << std::endl;
-        return;
     }
 }
 

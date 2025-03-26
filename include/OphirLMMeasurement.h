@@ -1,4 +1,6 @@
 #pragma once
+#ifndef GTS_CORE_COM_H
+#define GTS_CORE_COM_H
 
 // Class OphirLMMeasurement.
 // To use, add OphirLMMeasurement.h and OphirLMMeasurement.cpp to your project, and #include "OphirLMMeasurement.h"
@@ -14,6 +16,7 @@
 // nullptr to remove the callback. Note that the event system requires a
 // functioning Windows message loop.
 
+#include <WinSock2.h>
 #include <string>
 #include <vector>
 #include <functional>
@@ -186,3 +189,4 @@ private:
 	DWORD						m_dwEventCookie;	
 };
 
+#endif //GTS_CORE_COM_H

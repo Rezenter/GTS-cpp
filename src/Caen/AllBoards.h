@@ -5,7 +5,6 @@
 #ifndef GTS_CORE_ALLBOARDS_H
 #define GTS_CORE_ALLBOARDS_H
 
-//#include "Diagnostics/Diagnostics.h"
 #include "Caen/Link.h"
 
 #include "json.hpp"

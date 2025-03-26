@@ -1,8 +1,11 @@
-#include "mongoose.h"
+//#include "mongoose.h"
+
+#include <WinSock2.h>
+#include <thread>
 
 #include "src/Diagnostics/Diagnostics.h"
 #include <csignal>
-#include <thread>
+
 
 //for affinity
 #include <tchar.h>

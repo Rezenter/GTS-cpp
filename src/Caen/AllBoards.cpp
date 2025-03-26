@@ -122,6 +122,8 @@ Json AllBoards::init() {
     Link::params.pulseCount = diag->config["laser"][0]["pulse_count"];
     Link::params.linkInd = 0;
     unsigned int boards = 0;
+    
+
     for(const auto& sett_link: diag->config["fast adc"]["links"]){
         Link::params.nodeInd = 0;
         this->links.push_back(new Link());
@@ -164,7 +166,8 @@ Json AllBoards::init() {
             }
 
             std::cout << "link: " << Link::params.linkInd << ", node: " << Link::params.nodeInd << ", connecting CAEN board " << to_string(sett_node["serial"]) << std::endl;
-            this->links.back()->addNode();//link append node
+            
+            links.back()->addNode();//link append node
 
             Link::params.nodeInd++;
             boards++;
@@ -275,11 +278,8 @@ void AllBoards::arm() {
         std::cout << "CAENs arm command ignored: already armed" << std::endl;
         return;
     }
-    if(this->diag->storage.armed){
-        std::cout << "CAENs arm command ignored: storage not ready" << std::endl;
-        return;
-    }
-    this->diag->storage.arm();
+    
+    
     for(auto& link: this->links){
         link->arm();
     }
@@ -292,7 +292,7 @@ void AllBoards::arm() {
            sizeof(this->servaddr));
 */
     this->current_ind = 0;
-    this->worker = std::jthread([&links = this->links, &armed = this->armed, &storage = this->diag->storage, &current = this->current_ind](std::stop_token stoken){
+    this->worker = std::jthread([&links = this->links, &armed = this->armed, &diag = this->diag, &current = this->current_ind](std::stop_token stoken){
         //unsigned long long mask = 1 << 8; //allowed: 0b0001111100000000
         SetThreadAffinityMask(GetCurrentThread(), 1 << 8);
         //std::cout << "AllBoards thread: " << SetThreadAffinityMask(GetCurrentThread(), mask) << " " << GetCurrentThreadId() << std::endl;
@@ -327,8 +327,10 @@ void AllBoards::arm() {
             }
         }
         armed = false;
-        std::cout << "allBoards worker is stopping, saving data" << std::endl;
-        storage.save();
+        
+        std::cout << "allBoards worker is stopping, waiting for saving data" << std::endl;
+        
+        diag->storage.saveFast();
         return;
     });
     

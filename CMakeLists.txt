@@ -27,9 +27,11 @@ add_executable(GTS-core src/server.cpp
         src/Caen/AllBoards.cpp src/Caen/AllBoards.h
         src/Caen/Link.cpp src/Caen/Link.h
         src/Diagnostics/Storage.cpp src/Diagnostics/Storage.h
+        src/Ophir/Ophir.cpp src/Ophir/Ophir.h
+        include/OphirLMMeasurement.h include/OphirLMMeasurement.cpp
         )
 target_link_libraries(GTS-core ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.lib wsock32 ws2_32 )
 
 add_executable(test1 sandbox/test1.cpp)
 
-add_executable(testOphir src/Ophir/debug.cpp src/Ophir/OphirLMMeasurement.h src/Ophir/OphirLMMeasurement.cpp)
+add_executable(testOphir src/Ophir/debug.cpp include/OphirLMMeasurement.h include/OphirLMMeasurement.cpp)

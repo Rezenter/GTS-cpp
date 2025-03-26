@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "json.hpp"
-#include "Diagnostics/Storage.h"
 #include "Caen/Link.h"
 
 
@@ -24,8 +23,9 @@ public:
 
     inline const static std::filesystem::directory_entry dbRoot {R"(d:\data\db\)"};
     Json status();
-    void save();
+    void saveFast();
     void arm();
+    void disarm();
     static std::string shotn(bool isPlasma=true);
     bool armed = false;
 

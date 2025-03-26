@@ -33,20 +33,17 @@
                 <button type="button" onclick="LoadConfig()">Load</button>
               </td>
               <td>
-                <button type="button" onclick="console.log(aqc_configs);" disabled>print</button>
+                <label for="select_spectral">Spectral:</label><select id="select_spectral" disabled></select>
               </td>
               <td>
-                <label for="select_spectral">Spectral:</label><select id="select_spectral"></select>
+                <label for="select_abs">Abs.:</label><select id="select_abs" disabled></select>
               </td>
               <td>
-                <label for="select_abs">Abs.:</label><select id="select_abs"></select>
-              </td>
-              <td>
-                <label for="checkbox_isPlasma"  onclick="Request(
+                <label for="checkbox_isPlasma">is plasma?</label><input type="checkbox" id="checkbox_isPlasma"   onclick="Request(
                     {
                         subsystem: 'diag',
                         reqtype: 'isPlasma',
-                        state: !elements.isPlasma.checked
+                        state: elements.isPlasma.checked
                     }
                     , function (resp) {
                         if(!resp.ok){
@@ -54,7 +51,7 @@
                             alert(resp.err);
                         }
                     }
-                );">is plasma?</label><input type="checkbox" id="checkbox_isPlasma" checked>
+                );" checked>
                 </td>
                 <td>
                     <label for="shotn">№</label><output id="shotn"></output>
@@ -71,15 +68,29 @@
                 <td>
                     <output id="state_diag">Unknown</output>
                 </td>
-                <td>
-                    <output id="state_diag_OK" style="background-color:yellow;">OK/BAD</output>
+                <td id="state_diag_OK">
                 </td>
                 <td>
-                    <label for="checkbox_auto_diag" onclick="Request(
+                    <label for="checkbox_auto_diag" >Auto</label><input type="checkbox" id="checkbox_auto_diag" 
+                        onclick="Request(
+                            {
+                                subsystem: 'diag',
+                                reqtype: 'auto',
+                                state: elements.autoDiag.checked
+                            }
+                            , function (resp) {
+                                if(!resp.ok){
+                                    console.log(resp);
+                                    alert(resp.err);
+                                }
+                            }
+                        );">
+                </td>
+                <td>
+                    <button type="button" id="button_diag_arm" onclick="Request(
                         {
                             subsystem: 'diag',
-                            reqtype: 'auto',
-                            state: !elements.autoDiag.checked
+                            reqtype: 'arm'
                         }
                         , function (resp) {
                             if(!resp.ok){
@@ -87,19 +98,35 @@
                                 alert(resp.err);
                             }
                         }
-                    );">Auto</label><input type="checkbox" id="checkbox_auto_diag">
+                    );">Arm</button>
                 </td>
                 <td>
-                    <button type="button" id="button_diag_arm">Arm</button>
+                    <button type="button" id="button_diag_disarm" onclick="Request(
+                        {
+                            subsystem: 'diag',
+                            reqtype: 'disarm'
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Disarm</button>
                 </td>
                 <td>
-                    <button type="button" id="button_diag_disarm">Disarm</button>
-                </td>
-                <td>
-                    <button type="button" id="button_diag_trig_rough">Trig. rough</button>
-                </td>
-                <td>
-                    <button type="button" id="button_diag_trig_precise">Trig. precise</button>
+                    <button type="button" id="button_diag_trig" onclick="Request(
+                        {
+                            subsystem: 'diag',
+                            reqtype: 'trig'
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Trig.</button>
                 </td>
             </tr>
 
@@ -116,11 +143,11 @@
                 <td id="state_fast_OK" style="background-color:yellow;">
                 </td>
                 <td>
-                    <label for="checkbox_auto_fast"   onclick="Request(
+                    <label for="checkbox_auto_fast">Auto</label><input type="checkbox" id="checkbox_auto_fast" onclick="Request(
                         {
                             subsystem: 'diag',
                             reqtype: 'autoFast',
-                            state: !elements.autoFast.checked
+                            state: elements.autoFast.checked
                         }
                         , function (resp) {
                             if(!resp.ok){
@@ -128,7 +155,7 @@
                                 alert(resp.err);
                             }
                         }
-                    );">Auto</label><input type="checkbox" id="checkbox_auto_fast" checked disabled>
+                    );" checked>
                 </td>
                 <td>
                     <button type="button" id="button_fast_arm" onclick="Request(
@@ -189,7 +216,7 @@
                     <output id="state_slow_OK" style="background-color:yellow;">OK/BAD</output>
                 </td>
                 <td>
-                    <label for="checkbox_auto_slow">Auto</label><input type="checkbox" id="checkbox_auto_slow" checked disabled>
+                    <label for="checkbox_auto_slow">Auto</label><input type="checkbox" id="checkbox_auto_slow" checked>
                 </td>
                 <td>
                     <button type="button" id="button_slow_arm">Arm</button>
@@ -212,17 +239,41 @@
                 <td>
                     <output id="state_ophir">Unknown</output>
                 </td>
-                <td>
-                    <output id="state_ophir_OK" style="background-color:yellow;">OK/BAD</output>
+                <td id="state_ophir_OK">
                 </td>
                 <td>
-                    <label for="checkbox_auto_ophir">Auto</label><input type="checkbox" id="checkbox_auto_ophir" checked disabled>
+                    <label for="checkbox_auto_ophir">Auto</label><input type="checkbox" id="checkbox_auto_ophir" checked>
                 </td>
                 <td>
-                    <button type="button" id="button_ophir_arm">Arm</button>
+                    <button type="button" id="button_ophir_arm"  onclick="Request(
+                        {
+                            subsystem: 'ophir',
+                            reqtype: 'arm'
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Arm</button>
                 </td>
                 <td>
-                    <button type="button" id="button_ophir_disarm">Disarm</button>
+                    <button type="button" id="button_ophir_disarm"  onclick="Request(
+                        {
+                            subsystem: 'ophir',
+                            reqtype: 'disarm'
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Disarm</button>
+                </td>
+                <td>
+                    <label for="state_laser_energy">Elas: </label><output id="state_laser_energy">???</output>
                 </td>
             </tr>
             
@@ -239,11 +290,11 @@
                 <td  rowspan="2" id="state_laser_OK" style="background-color:yellow;">
                 </td>
                 <td>
-                    <label for="checkbox_auto_laser_on" onclick="Request(
+                    <label for="checkbox_auto_laser_on">Auto ON</label><input type="checkbox" id="checkbox_auto_laser_on" onclick="Request(
                         {
                             subsystem: 'diag',
                             reqtype: 'autoLasOn',
-                            state: !elements.autoLasOn.checked
+                            state: elements.autoLasOn.checked
                         }
                         , function (resp) {
                             if(!resp.ok){
@@ -251,7 +302,7 @@
                                 alert(resp.err);
                             }
                         }
-                    );">Auto ON</label><input type="checkbox" id="checkbox_auto_laser_on" checked disabled>
+                    );" checked disabled>
                 </td>
                 <td rowspan="2">
                     <button type="button" id="button_laser_on" onclick="Request(
@@ -286,17 +337,14 @@
                 <td rowspan="2">
                     <button type="button" id="button_laser_trig" disabled>Trig.</button>
                 </td>
-                <td rowspan="2">
-                    <label for="state_laser_energy">Elas: </label><output id="state_laser_energy">???</output>
-                </td>
             </tr>
             <tr>
                 <td>
-                    <label for="checkbox_auto_laser_off" onclick="Request(
+                    <label for="checkbox_auto_laser_off">Auto Off</label><input type="checkbox" id="checkbox_auto_laser_off" onclick="Request(
                         {
                             subsystem: 'diag',
                             reqtype: 'autoLasOff',
-                            state: !elements.autoLasOff.checked
+                            state: elements.autoLasOff.checked
                         }
                         , function (resp) {
                             if(!resp.ok){
@@ -304,7 +352,7 @@
                                 alert(resp.err);
                             }
                         }
-                    );">Auto Off</label><input type="checkbox" id="checkbox_auto_laser_off" checked>
+                    );" checked>
                 </td>
             </tr>
             <tr>
@@ -324,7 +372,7 @@
                     <output id="state_dac_OK" style="background-color:yellow;">OK/BAD</output>
                 </td>
                 <td colspan="3">
-                    <label for="select_dac_gas">gas programm:</label><select id="select_dac_gas"></select>
+                    <label for="select_dac_gas">gas programm:</label><select id="select_dac_gas" disabled></select>
                 </td>
             </tr>
 
@@ -385,15 +433,21 @@
         autoDiag: document.getElementById("checkbox_auto_diag"),
         autoFast: document.getElementById("checkbox_auto_fast"),
         autoLasOn: document.getElementById("checkbox_auto_laser_on"),
-        autoLasOff: document.getElementById("checkbox_auto_laser_off")
+        autoLasOff: document.getElementById("checkbox_auto_laser_off"),
+        diagTrig: document.getElementById("button_diag_trig"),
+        autoOphir: document.getElementById("checkbox_auto_ophir"),
+        ophirArm: document.getElementById("button_ophir_arm"),
+        ophirDisarm: document.getElementById("button_ophir_disarm"),
+        ophirLag: document.getElementById("lag_ophir"),
+        ophirStatus: document.getElementById("state_ophir"),
+        ophirLED: document.getElementById("state_ophir_OK"),
+        diagArm: document.getElementById("button_diag_arm"),
+        diagDisarm: document.getElementById("button_diag_disarm"),
+        diagLED: document.getElementById("state_diag_OK")
     };
 
     Request = function (req, callback) {
         $.post('/api', JSON.stringify(req), callback, 'json');
-    };
-
-    ConnectControls = function () {
-        //$('#button_load_cpp_config').on('click', this, LoadConfig);
     };
 
     GetConfigs = function(){
@@ -440,16 +494,23 @@
     UpdateStatus = function(status){
         elements.mainLag.style.background = "green";
 
+        elements.diagTrig.disabled = elements.isPlasma.checked;
         if(elements.isPlasma.checked){
             elements.shotn.value = status.storage.shotn;
         }else{
             elements.shotn.value = status.storage.debug_shtn;
         }
-        
+        elements.diagArm.disabled = status.storage.armed;
+        elements.diagDisarm.disabled = !status.storage.armed;
         //
 
         elements.diagLag.value = status.elapsed;
-
+        if(status.storage.armed){
+            elements.diagLED.style.background = "purple";
+        }else{
+            elements.diagLED.style.background = "white";
+        }
+        
         // 
 
         elements.fastLag.value = Date.now() - status.caens.timestamp;
@@ -549,14 +610,40 @@
         elements.autoFast.checked = status.auto.fast;
         elements.autoLasOn.checked = status.auto.lasOn;
         elements.autoLasOff.checked = status.auto.lasOff;
+        //ophir
 
-        elements.autoFast.disabled = !status.auto.full;
-        elements.autoLasOn.disabled = !status.auto.full;
+        //elements.autoFast.disabled = !status.auto.full;
+        //elements.autoLasOn.disabled = !status.auto.full;
+        //elements.autoOphir.disabled = !status.auto.full;
+
+        //
+
+        elements.ophirLag.value = Date.now() - status.ophir.timestamp;
+        if(status.ophir.ok){
+            if(status.ophir.armed){
+                elements.ophirStatus.value = "Armed " + status.ophir.curr;
+                elements.fophirLED.style.background = "green";
+                elements.ophirArm.disabled = true;
+                elements.ophirDisarm.disabled = false;
+            }else{
+                elements.ophirDisarm.disabled = true;
+                elements.ophirStatus.value = "Disarmed";
+                elements.ophirLED.style.background = "white";
+                elements.ophirArm.disabled = false;
+            }
+        }else{
+            elements.ophirStatus.value = "Error!";
+            elements.ophirLED.style.background = "red";
+            elements.ophirArm.disabled = true;
+            elements.ophirDisarm.disabled = true;
+            elements.ophirTrig.disabled = true;
+        }
+        
+
     }
 
     $(document).ready(
         function () {
-            //ConnectControls();
             GetConfigs();
             
             setInterval(
