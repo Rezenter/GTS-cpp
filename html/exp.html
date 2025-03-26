@@ -242,7 +242,19 @@
                 <td id="state_ophir_OK">
                 </td>
                 <td>
-                    <label for="checkbox_auto_ophir">Auto</label><input type="checkbox" id="checkbox_auto_ophir" checked>
+                    <label for="checkbox_auto_ophir">Auto</label><input type="checkbox" id="checkbox_auto_ophir" onclick="Request(
+                        {
+                            subsystem: 'diag',
+                            reqtype: 'autoOphir',
+                            state: elements.autoOphir.checked
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );" checked>
                 </td>
                 <td>
                     <button type="button" id="button_ophir_arm"  onclick="Request(
@@ -610,7 +622,7 @@
         elements.autoFast.checked = status.auto.fast;
         elements.autoLasOn.checked = status.auto.lasOn;
         elements.autoLasOff.checked = status.auto.lasOff;
-        //ophir
+        elements.autoOphir.checked = status.auto.ophir;
 
         //elements.autoFast.disabled = !status.auto.full;
         //elements.autoLasOn.disabled = !status.auto.full;

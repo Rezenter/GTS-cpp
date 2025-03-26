@@ -316,3 +316,4 @@ build/.cmake/api/v1/reply/target-testOphir-Release-93f985f4ec5edde7a024.json
 build/.cmake/api/v1/reply/target-testOphir-RelWithDebInfo-b8af796780a9addf3880.json
 build/GTS-core.dir/Release/OphirLMMeasurement.tlh
 build/GTS-core.dir/Release/OphirLMMeasurement.tli
+utils/debug.json

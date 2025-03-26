@@ -24,6 +24,7 @@ public:
     inline const static std::filesystem::directory_entry dbRoot {R"(d:\data\db\)"};
     Json status();
     void saveFast();
+    void saveOphir(unsigned short count);
     void arm();
     void disarm();
     static std::string shotn(bool isPlasma=true);

@@ -3,53 +3,136 @@
 
 
 Ophir::~Ophir(){
-    //OphirLM.CloseAll(); //close device
+    this->disarm();
     std::cout << "Ophir destructed" << std::endl;
 };
 
 void Ophir::connect(){
-    if(this->init){
-        this->disconnect();
+    if(this->init.load()){
+        this->disarm();
     }
     
-    try{
-        
-        std::vector<std::wstring> serialNumbers;
-        OphirLM.ScanUSB(serialNumbers);
+    this->thread = std::jthread([th=this](std::stop_token stoken){
+        SetThreadAffinityMask(GetCurrentThread(), 1 << 9);
 
-        if(serialNumbers.size() == 0){
-            std::cout << "Ophir not found" << std::endl;
-            return;
+        struct CoInitializer{
+            CoInitializer() { CoInitialize(nullptr); }
+            ~CoInitializer() { CoUninitialize(); }
+        };
+        CoInitializer initializer;// must call for COM initialization and deinitialization
+
+        OphirLMMeasurement OphirLM;
+        long hDevice = 0;
+        try{
+            std::vector<std::wstring> serialNumbers;
+
+            OphirLM.ScanUSB(serialNumbers);
+
+            if(serialNumbers.size() == 0){
+                std::cout << "Ophir not found" << std::endl;
+            }else{
+
+                OphirLM.OpenUSBDevice(th->serial.c_str(), hDevice);
+    
+                std::wstring info ,headSN, headType, headName, version;
+                std::wstring deviceName, romVersion, serialNumber;
+                OphirLM.GetDeviceInfo(hDevice, deviceName, romVersion, serialNumber);
+                OphirLM.GetSensorInfo(hDevice, th->channel, headSN, headType, headName); 
+                //std::wcout << L"Head name:          " << headName << L" \n"; // PE50-DIF-C
+                //std::wcout << L"Head sn:          " << headSN << L" \n";    // 959905
+                
+                
+                std::cout << "OPHIR SETTINGS!!!\n\n" << std::endl;
+                
+                th->init = true;
+                //this->arm();
+            }
+    
+            
+        }catch (const _com_error& e){
+            th->init = false;
+            std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
         }
+        if(th->init){
+            std::cout << "Ophir init OK, entering command loop" << std::endl;
+            bool stop = false;
+            while(!(stoken.stop_requested() || stop)){
+                if(!th->armed.load() && th->requestArm.load()){
+                    std::cout << "ophir got arm request" << std::endl;
+        
+                    th->energy.fill(0);
+                    th->times.fill(0);
+                    
+                    try{      
+                        OphirLM.StartStream(hDevice, th->channel);
+                    }catch (const _com_error& e){
+                        std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
+                    }
+                
+                    th->count = 0;
+                    th->requestArm = false;
+                    th->armed = true;
+                }
+                if(th->armed.load()){
+                    try{
+                        std::vector<double> values; //Joul
+                        std::vector<double> timestamps; //ms
+                        std::vector<OphirLMMeasurement::Status> statuses; //0 = ok
+                
+                        OphirLM.GetData(hDevice, th->channel, values, timestamps, statuses);
+                        
+                        for(size_t i = 0; i < values.size(); ++i){
+                            if(statuses[i] == OphirLMMeasurement::Status::frequency){
+                                //skip trash
+                            }else{
+                            
+                                if(statuses[i] == OphirLMMeasurement::Status::ok){
+                                    th->energy[th->count.load()] = values[i];
+                                }else{
+                                    th->energy[th->count.load()] = -statuses[i]; //store error
+                                }
+                                th->times[th->count.load()] = (unsigned long int)(timestamps[i]*1000);
+                                th->count++;
+                                if(th->count.load() > th->diag->config["laser"][0]["pulse_count"]){
+                                    stop = true;
+                                    th->armed = false;
+                                }
+                            }
+                            /*
+                            std::wcout << L"Timestamp: " << std::fixed << std::setprecision(3) << timestamps[i]
+                                << L" Reading: " << std::scientific << values[i] << L" Status: " << statuses[i]<< L"\n"; 
+                        */
+                        }
+                        th->timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();             
+                    }catch (const _com_error& e){
+                        std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
+                    }
 
-        OphirLM.OpenUSBDevice(Ophir::serial.c_str(), this->hDevice);
+                }else{
+                    try{
+                        std::wstring headSN, headType, headName;
+                        OphirLM.GetSensorInfo(hDevice, th->channel, headSN, headType, headName); 
 
-        std::wstring info ,headSN, headType, headName, version;
-        std::wstring deviceName, romVersion, serialNumber;
-        OphirLM.GetDeviceInfo(this->hDevice, deviceName, romVersion, serialNumber);
-        OphirLM.GetSensorInfo(this->hDevice, Ophir::channel, headSN, headType, headName); 
-        //std::wcout << L"Head name:          " << headName << L" \n"; // PE50-DIF-C
-        //std::wcout << L"Head sn:          " << headSN << L" \n";    // 959905
-        
-        
-        std::cout << "OPHIR SETTINGS!!!\n\n" << std::endl;
-        
-        this->init = true;
-        this->arm();
-	}catch (const _com_error& e){
-		std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
-		// 0x00000000 (S_OK) : No Error
-		// 0x80070057 (E_INVALIDARG) : Invalid Argument
-		// 0x80040201 : Device Already Opened
-		// 0x80040300 : Device Failed
-		// 0x80040301 : Device Firmware is Incorrect
-		// 0x80040302 : Sensor Failed
-		// 0x80040303 : Sensor Firmware is Incorrect
-		// 0x80040306 : This Sensor is Not Supported
-		// 0x80040308 : The Device is no longer Available
-		// 0x80040405 : Command Failed
-		// 0x80040501 : A channel is in Stream Mode
-	}
+                    }catch (const _com_error& e){
+                        std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
+                    } 
+                    
+                    th->timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                }
+            }
+        }
+        //save
+        th->diag->storage.saveOphir(min(th->count.load(), th->energy.size()));
+
+        std::cout << "Ophir end" << std::endl;
+        th->init = false;
+        try{
+            OphirLM.StopAllStreams(); //stop measuring
+            OphirLM.CloseAll(); //close device
+        }catch (const _com_error& e){
+            std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
+        }
+    });
 };
 
 Json Ophir::handleRequest(Json& req){
@@ -78,102 +161,28 @@ Json Ophir::handleRequest(Json& req){
 
 Json Ophir::status(){   
     return Json({
-        {"ok", this->init},
+        {"ok", this->init.load()},
         {"armed", this->armed.load()},
-        {"timestamp", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()},
-        {"curr", 0}
+        {"timestamp", this->timestamp.load()},
+        {"curr", this->count.load()}
     });
 };
 
 void Ophir::arm(){
-    if(this->init && !this->armed){
+    std::cout << "ophir arm call" << std::endl;
+    if(this->init && !this->armed.load()){
         std::cout << "ophir arming" << std::endl;
-        
-        this->values.clear();
-        this->timestamps.clear();
-        this->statuses.clear();
 
-        
-        try{
-        
-            //this->values.reserve();
-            
-            std::cout << "config ..." << std::endl;
-            //OphirLM.ConfigureStreamMode(this->hDevice, this->channel, 2, 1); // disable buffering
-    
-            OphirLM.StartStream(this->hDevice, this->channel);
-            std::cout << "config OK" << std::endl;
-            this->armed = true;
-    
-                
-        }catch (const _com_error& e){
-            std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
-        }
-
-
-        bool stopped = false;
-
-        long long begin = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        while(!(stopped)){
-            //stopped = true;
-    
-            try{
-                //these are buffers.
-                std::vector<double> values; //Joul
-                std::vector<double> timestamps; //ms
-                std::vector<OphirLMMeasurement::Status> statuses; //0 = ok, 4=reset
-        
-                OphirLM.GetData(this->hDevice, this->channel, values, timestamps, statuses);
-                
-                for (size_t i = 0; i < values.size(); ++i){
-                    std::wcout << L"Timestamp: " << std::fixed << std::setprecision(3) << timestamps[i]
-                        << L" Reading: " << std::scientific << values[i] << L" Status: " << statuses[i]<< L"\n"; 
-                }
-                if(values.size() > 0){
-                    std::cout << "Ophir got " << values.size() << std::endl;
-                }
-                
-                //When inserting a range, the range version of insert() is generally preferable as it preserves the correct capacity growth behavior, unlike reserve() followed by a series of push_back()s.
-                //extend real storage
-                
-                //check stop condition
-                //add current
-                if(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() - begin > 10*1000){
-                    stopped = true;
-
-                }
-            }catch (const _com_error& e){
-                std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
-            }
-        }
-        armed = false;
-        std::cout << "ophir worker done" << std::endl;
-        return;
-        
+        this->requestArm = true;   
     }
-    
 };
 
 void Ophir::disarm(){
-    if(this->init){
-        this->armed = false;
-        try{
-            this->worker.request_stop();
-            OphirLM.StopAllStreams(); //stop measuring
-            OphirLM.CloseAll();
-        }catch (const _com_error& e){
-            std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
-        }
+    this->armed = false;
+    if(this->init.load()){
+        this->thread.request_stop();
+        this->thread.join();
     }
-};
-
-void Ophir::disconnect(){
-    this->disarm();
     this->init = false;
-    try{
-        std::wcout << L"Device has been removed from the USB. \n";
-        OphirLM.CloseAll(); //close device
-    }catch (const _com_error& e){
-        std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
-    }
+    //re-init in diag?
 };

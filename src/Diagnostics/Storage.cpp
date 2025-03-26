@@ -136,6 +136,34 @@ void Storage::saveFast() {
     }
 }
 
+void Storage::saveOphir(unsigned short count) {
+    if(this->armed){
+        std::cout << "saving Ophir " << count << std::endl;
+        std::ofstream outFile;
+
+        //int count = 0;
+        std::stringstream filename;
+
+        Json data = Json::array();
+        for (size_t event_ind = 0; event_ind < count; event_ind++) {
+            data.push_back(Json::array({(this->diag->ophir.times[event_ind] - this->diag->ophir.times[0]), this->diag->ophir.energy[event_ind]}));
+        }
+        
+
+        filename.str(std::string());
+        filename << "ophir.msgpk";
+        outFile.open(this->currentPath.path().string() + filename.str(), std::ios::out | std::ios::binary);
+        for (const auto &e : Json::to_msgpack(data)) outFile << e;
+        outFile.close();
+
+        this->diag->savedOphir = true;
+        std::cout << "Ophir file written: " << this->currentPath.path().string() << std::endl;
+    }else{
+        std::cout << "attempt to save not armed storage" << std::endl;
+        return;
+    }
+}
+
 void Storage::disarm(){
     if(this->armed){
         this->armed = false;

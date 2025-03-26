@@ -299,7 +299,7 @@ void AllBoards::arm() {
 
         bool stopped = false;
         unsigned short ready = USHRT_MAX;
-        while(!(stoken.stop_requested() or stopped)){
+        while(!(stoken.stop_requested() || stopped)){
             ready = USHRT_MAX;
             stopped = true;
 

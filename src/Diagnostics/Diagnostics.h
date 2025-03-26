@@ -48,9 +48,9 @@ public:
     Laser330 laser;
     Storage storage;
     AllBoards caens;
-    //Ophir ophir;
+    Ophir ophir;
 
-    Diagnostics(): caens(this), storage(this), mgr{nullptr}{};
+    Diagnostics(): caens(this), storage(this), mgr{nullptr}, ophir(this){};
     static void handleUDPBroadcast(struct mg_connection *c, int ev, void *ev_data);
     void setMgr(mg_mgr *mgr){
         this->mgr = mgr;

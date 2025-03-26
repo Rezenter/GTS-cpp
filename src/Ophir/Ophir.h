@@ -19,31 +19,25 @@ class Ophir{
 private:
     Diagnostics* diag;
 
-    std::jthread worker;
+    //std::jthread worker;
+    std::jthread thread;
     std::wstring serial = L"955794";
-    long hDevice = 0;
-    long channel = 0;
-    unsigned short current_ind = 0;
     
-    struct CoInitializer{
-        CoInitializer() { CoInitialize(nullptr); }
-        ~CoInitializer() { CoUninitialize(); }
-    };
+    long channel = 0;
 
-    CoInitializer initializer;// must call for COM initialization and deinitialization
-
-    OphirLMMeasurement OphirLM; // COMObject it can be only used directly from the thread it was created in
-
-    void disconnect();
-
-    bool init = false;
+    std::atomic<bool> init = false;
     std::atomic<bool> armed = false;
+    std::atomic<bool> requestArm = false;
+    std::atomic<unsigned short> count = 0;
+    std::atomic<long long> timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-    std::vector<double> values;
-    std::vector<double> timestamps;
-    std::vector<OphirLMMeasurement::Status> statuses;
+    static inline const unsigned short MAX_EVENTS = 16384;
+
 
 public:
+    std::array<double , Ophir::MAX_EVENTS> energy;
+    std::array<unsigned long int, Ophir::MAX_EVENTS> times;
+
     explicit Ophir(Diagnostics* parent): diag{parent} {};
     ~Ophir();
 

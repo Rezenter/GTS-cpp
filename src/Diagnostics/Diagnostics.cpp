@@ -77,6 +77,18 @@ Json Diagnostics::handleRequest(Json& payload){
                             {"err", "state not found"}
                         };
                     }   
+                }else if(payload.at("reqtype") == "autoOphir"){
+                    if(payload.contains("state")){
+                        this->ophirAuto = payload["state"];
+                        resp = {
+                            {"ok", true}
+                        };
+                    }else{
+                        resp = {
+                            {"ok", false},
+                            {"err", "state not found"}
+                        };
+                    }   
                 }else if(payload.at("reqtype") == "autoLasOn"){
                     if(payload.contains("state")){
                         this->lasAutoOn = payload["state"];
@@ -120,7 +132,7 @@ Json Diagnostics::handleRequest(Json& payload){
         }else if(payload.at("subsystem") == "fast"){
             resp = this->caens.handleRequest(payload);
         }else if(payload.at("subsystem") == "ophir"){
-            //resp = this->ophir.handleRequest(payload);
+            resp = this->ophir.handleRequest(payload);
         }else{
             resp = {
                     {"ok", false},
@@ -196,7 +208,7 @@ void Diagnostics::arm(){
     this->savedFast = !this->fastAuto;
 
     if(this->ophirAuto){
-        //this->ophir.arm();
+        this->ophir.arm();
     }
     this->savedOphir = !this->ophirAuto;
 
@@ -232,12 +244,14 @@ void Diagnostics::arm(){
 }
 
 void Diagnostics::disarm(){
-   
     if(this->lasAutoOff){
         this->laser.stop();
     }
     if(this->fastAuto){
         this->caens.disarm();
+    }
+    if(this->ophirAuto){
+        this->ophir.disarm();
     }
 
     //save laser status
@@ -256,7 +270,6 @@ void Diagnostics::disarm(){
 
     //wait for all expected saves
 
-
     const auto start = std::chrono::system_clock::now();
     while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start).count() <= 5000){
         if(!this->storage.armed){
@@ -267,9 +280,12 @@ void Diagnostics::disarm(){
         using namespace std::chrono_literals;
         std::this_thread::sleep_for(100ms);
     }
-
     this->saving.request_stop();
-    this->saving.join();
+    if(this->saving.joinable()){
+        this->saving.join();
+
+        this->ophir.connect();
+    }
 }
 
 void Diagnostics::trig(){
@@ -334,19 +350,16 @@ Json Diagnostics::loadConfig(std::string filename) {
     }
 
 
+    this->disarm();
+
     this->config = candidate;
     Json resp({
                       {"ok", true},
                       {"config", this->config}
               });
-    
-    /*
-    std::jthread ophirThread = std::jthread([th=this](std::stop_token stoken){
-        SetThreadAffinityMask(GetCurrentThread(), 1 << 9);
-        Ophir ophir(th);
-        ophir.connect();
-    });
-*/
+            
+    this->ophir.connect();
+
     this->caens.initialising = true;
     this->caens.init();
     this->caens.initialising = false;
@@ -375,13 +388,14 @@ Json Diagnostics::status() {
             {"laser", this->laser.status()},
             {"coolant", this->coolant.status()},
             {"caens", this->caens.status()},
-            //{"ophir", this->ophir.status()},
+            {"ophir", this->ophir.status()},
             {"auto", {
                     {"isPlasma", this->isPlasma},
                     {"full", this->fullAuto},
                     {"fast", this->fastAuto},
                     {"lasOn", this->lasAutoOn},
-                    {"lasOff", this->lasAutoOff}
+                    {"lasOff", this->lasAutoOff},
+                    {"ophir", this->ophirAuto}
                 }
             }
     };
