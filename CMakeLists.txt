@@ -35,3 +35,6 @@ target_link_libraries(GTS-core ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.lib
 add_executable(test1 sandbox/test1.cpp)
 
 add_executable(testOphir src/Ophir/debug.cpp include/OphirLMMeasurement.h include/OphirLMMeasurement.cpp)
+
+add_executable(testCaen src/Caen/test.cpp)
+target_link_libraries(testCaen ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.lib)

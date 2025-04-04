@@ -4,7 +4,6 @@
 
 #include "Diagnostics.h"
 #include <chrono>
-#include <fstream>
 
 using Json = nlohmann::json;
 
@@ -20,10 +19,24 @@ Json Diagnostics::handleRequest(Json& payload){
         }else if(payload.at("subsystem") == "diag"){
             if(payload.contains("reqtype")){
                 if(payload.at("reqtype") == "get_configs"){
-                    resp = this->getConfigs();
+                    resp = this->storage.getConfigs();
                 }else if(payload.at("reqtype") == "load_config"){
                     if(payload.contains("filename")) {
-                        resp = this->loadConfig(payload.at("filename"));
+                        if(payload.contains("spectral")) {
+                            if(payload.contains("abs")) {
+                                resp = this->loadConfig(payload.at("filename"), payload.at("spectral"), payload.at("abs"));
+                            }else{
+                                resp = {
+                                        {"ok", false},
+                                        {"err", "request has no 'abs'"}
+                                };
+                            }
+                        }else{
+                            resp = {
+                                    {"ok", false},
+                                    {"err", "request has no 'spectral'"}
+                            };
+                        }
                     }else{
                         resp = {
                                 {"ok", false},
@@ -284,7 +297,12 @@ void Diagnostics::disarm(){
     if(this->saving.joinable()){
         this->saving.join();
 
-        this->ophir.connect();
+        //this->ophir.connect();
+
+        //this->caens.initialising = true;
+        //this->caens.reinit();
+        //std::cout << "FIX caen init indicator here" << std::endl;
+        //this->caens.initialising = false;
     }
 }
 
@@ -295,88 +313,54 @@ void Diagnostics::trig(){
     this->disarm();
 }
 
-Json Diagnostics::getConfigs() {
-    std::filesystem::directory_entry configPath {Storage::dbRoot.path().string() + "config_cpp\\"};
-    if(!configPath.exists()){
-        return Json({
-                    {"ok", false},
-                    {"err", "hardcoded directory not found: d:\\data\\db\\config_cpp\\"}
-            });
-    }
-    Json resp({
-                {"ok", true},
-                {"files", {}}
-        });
-
-    for (auto const& dir_entry : std::filesystem::directory_iterator{configPath}) {
-        resp["files"].push_back(dir_entry.path().filename().string());
-        
-        //std::cout << dir_entry.path() << '\n';
-    }
-    std::sort(resp["files"].begin(), resp["files"].end(), std::greater<std::string>());
-
-    return resp;
-}
-
-Json Diagnostics::loadConfig(std::string filename) {
-    std::filesystem::directory_entry configFile {Storage::dbRoot.path().string() + "config_cpp\\" + filename};
-    if(!configFile.exists()){
-        return Json({
-                     {"ok", false},
-                     {"err", "WTF? file not found"},
-                     {"also", configFile.path().string()}
-             });
-    }
-
-    std::ifstream file;
-    file.open(configFile);
-    Json candidate = Json::parse(file);
-    file.close();
-
-    MG_INFO(("WARNING! config file is not checked"));
-    //check config file fields, critical for code execution
-    if(candidate.contains("type")){
-        if(candidate.at("type") != "configuration_cpp"){
-            return {
-                    {"ok", false},
-                    {"err", "configuration file has wrong type: " + to_string(candidate.at("type"))}
-            };
-        }
-    }else{
+Json Diagnostics::loadConfig(std::string filename, std::string spectral, std::string abs) {
+    this->disarm();
+    if(!this->storage.setConfig(filename)){
         return {
-                {"ok", false},
-                {"err", "configuration file has no field 'type'"}
+            {"ok", false},
+            {"err", "storage rejected the config"}
         };
     }
 
+    if(!this->storage.setSpectral(spectral)){
+        return {
+            {"ok", false},
+            {"err", "storage rejected spectral"}
+        };
+    }
 
-    this->disarm();
+    if(!this->storage.setAbs(abs)){
+        return {
+            {"ok", false},
+            {"err", "storage rejected abs"}
+        };
+    }
+    
+    this->fullAuto = storage.config["auto"]["diag"];
+    this->fastAuto = storage.config["auto"]["fast"];
+    this->slowAuto = storage.config["auto"]["slow"];
+    this->ophirAuto = storage.config["auto"]["ophir"];
+    this->lasAutoOn = storage.config["auto"]["lasOn"];
+    this->lasAutoOff = storage.config["auto"]["lasOff"];
 
-    this->config = candidate;
-    Json resp({
-                      {"ok", true},
-                      {"config", this->config}
-              });
-            
     this->ophir.connect();
 
     this->caens.initialising = true;
     this->caens.init();
     this->caens.initialising = false;
     
-    resp["status"] = this->status();
-
-    return resp;
+    return {
+        {"ok", true},
+        {"config", this->storage.config},
+        {"status", this->status()}
+    };
 }
 
 void Diagnostics::die() {
     std::cout << "Killing diag" << std::endl;
-    std::cout << "  Killing coolant" << std::endl;
-    //this->coolant;
-    std::cout << "  Killing caens" << std::endl;
-    //this->caens;
-    std::cout << "  Killing laser" << std::endl;
-    //this->laser;
+
+    this->disarm();
+
     std::cout << "diag dead" << std::endl;
 }
 
@@ -412,4 +396,5 @@ void Diagnostics::save() {
     //is_plasma?
     //calculate folder
     //save data
+    //save header separetly, append after all data ready. include ophir count.
 }

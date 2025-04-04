@@ -17,6 +17,7 @@
 #include <atomic>
 #include <iostream>
 #include <climits>
+#include <mutex>
 
 using Json = nlohmann::json;
 
@@ -32,6 +33,9 @@ struct Params{
     unsigned int pulseCount;
     unsigned int prehistorySep;
     float firstShot;
+    bool waitRT;
+    uint32_t serial;
+    std::mutex* mutex;
 };
 
 union Timestamp{
@@ -41,7 +45,6 @@ union Timestamp{
 
 class Node {
 private:
-    bool ok = false;
     bool armed = false;
     CAEN_DGTZ_BoardInfo_t boardInfo;
     
@@ -54,6 +57,8 @@ public:
     Json status();
     Params params;
     bool arm();
+    bool ok = false;
+    int handle = 0;
 
     constexpr const static std::pair<unsigned short, unsigned short> zeroInd[16] = {
         {100, 200},
@@ -99,45 +104,39 @@ public:
     static inline const unsigned short MAX_DEPTH = 1024;
     char* readoutBuffer = NULL;
     uint32_t readoutBufferSize = 0;
-    int handle = 0;
+    
     std::array<std::array<std::array<unsigned short, Node::MAX_DEPTH>, Node::MAX_CH>, Node::MAX_EVENTS> result;
     std::array<std::array<unsigned short, Node::MAX_CH>, Node::MAX_EVENTS> zero;
     std::array<std::array<unsigned short, Node::MAX_CH>, Node::MAX_EVENTS> ph_el;
     std::array<unsigned long int, Node::MAX_EVENTS> times;
-    //std::array<std::latch*, SHOT_COUNT>& processed;
     std::atomic<unsigned short> evCount;
     void disarm();
     std::atomic<unsigned short> trigger = 0;
-    /*
-    const void trigger(){
-        if(this->armed){
-            //std::cout << "trigger link " << this->params.linkInd << " from thread " << GetCurrentThreadId() << std::endl;
-            
-            if(CAEN_DGTZ_SendSWtrigger(this->handle) != CAEN_DGTZ_Success){
-                std::cout << this->params.linkInd << " SW trigger failed" << std::endl;
-            }
-        }
-    };*/
 
 };
 
 class Link {
 private:
     static inline unsigned short totalLinks = 0;
-    std::jthread worker;
-
+    std::jthread thread;
+    
 public:
+    std::atomic<bool> ok = false;
+
     std::atomic<bool> armed = false;
+    std::atomic<bool> requestArm = false;
+    std::atomic<bool> requestDisarm = false;
+    std::atomic<bool> requestSave = false;
+
     Link(): linkInd{totalLinks}{
       totalLinks++;
     };
-    unsigned int linkInd;
+    unsigned int linkInd; //const?
     std::vector<Node*> nodes;
-    void addNode();
+    std::vector<Params> params;
     ~Link();
     Json status();
     void arm();
-    static Params params;
     void disarm();
     void trigger(unsigned short count){
         if(this->armed){
@@ -146,6 +145,7 @@ public:
             }
         }
     };
+    void init();
 };
 
 

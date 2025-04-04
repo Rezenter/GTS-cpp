@@ -3,17 +3,24 @@
 
 
 Ophir::~Ophir(){
+    std::cout << "Ophir destructor" << std::endl;
     this->disarm();
+    this->thread.request_stop();
+    this->thread.join();
     std::cout << "Ophir destructed" << std::endl;
 };
 
 void Ophir::connect(){
     if(this->init.load()){
         this->disarm();
+        this->thread.request_stop();
+        this->thread.join();
     }
     
     this->thread = std::jthread([th=this](std::stop_token stoken){
         SetThreadAffinityMask(GetCurrentThread(), 1 << 9);
+
+        th->channel = th->diag->storage.config["laser"][0]["ophir"]["channel"];
 
         struct CoInitializer{
             CoInitializer() { CoInitialize(nullptr); }
@@ -24,42 +31,106 @@ void Ophir::connect(){
         OphirLMMeasurement OphirLM;
         long hDevice = 0;
         try{
-            std::vector<std::wstring> serialNumbers;
+            std::vector<std::wstring> results;
 
-            OphirLM.ScanUSB(serialNumbers);
+            OphirLM.ScanUSB(results);
 
-            if(serialNumbers.size() == 0){
+            if(results.size() == 0){
                 std::cout << "Ophir not found" << std::endl;
             }else{
+                bool found = false;
+                std::wstring expectedSerial;
+                for(auto c: (std::string)th->diag->storage.config["laser"].at(0)["ophir"]["ADCSerial"]){
+                    expectedSerial.append(1, c);
+                }
+                for(auto& ser: results){
+                    if(expectedSerial.compare(ser) == 0){
+                        std::cout << "Ophir found" << std::endl;
+                        found = true;
+                        break;
+                    }
+                }
+                if(found){
+                    OphirLM.OpenUSBDevice(th->serial.c_str(), hDevice);
+        
+                    std::wstring info ,headSN, headType, headName, version;
+                    std::wstring deviceName, romVersion, serialNumber;
+                    OphirLM.GetDeviceInfo(hDevice, deviceName, romVersion, serialNumber);
+                    OphirLM.GetSensorInfo(hDevice, th->channel, headSN, headType, headName);
+                    expectedSerial.clear();
+                    for(auto c: (std::string)th->diag->storage.config["laser"].at(0)["ophir"]["headSerial"]){
+                        expectedSerial.append(1, c);
+                    }
+                    if(expectedSerial.compare(headSN) != 0){
+                        std::cout << "Ophir has wrong head serial connected to the selected channel" << std::endl;
+                        std::wcout << expectedSerial << " " << headSN << std::endl;
+                        return;
+                    }
+                    //std::wcout << L"Head name:          " << headName << L" \n"; // PE50-DIF-C
+                    //std::wcout << L"Head sn:          " << headSN << L" \n";    // 959905
+                    
 
-                OphirLM.OpenUSBDevice(th->serial.c_str(), hDevice);
-    
-                std::wstring info ,headSN, headType, headName, version;
-                std::wstring deviceName, romVersion, serialNumber;
-                OphirLM.GetDeviceInfo(hDevice, deviceName, romVersion, serialNumber);
-                OphirLM.GetSensorInfo(hDevice, th->channel, headSN, headType, headName); 
-                //std::wcout << L"Head name:          " << headName << L" \n"; // PE50-DIF-C
-                //std::wcout << L"Head sn:          " << headSN << L" \n";    // 959905
+                    /*
+                    diffuser: int = 1  # diffuser (0, ('N/A',))
+                    measurement_mode: int = 1  # MeasMode (1, ('Power', 'Energy'))
+                    pulse_length: int = 0 # PulseLengths (0, ('30uS', '1.0mS'))
+                    measurement_range: int = 2  #Ranges (2, ('10.0J', '2.00J', '200mJ', '20.0mJ', '2.00mJ', '200uJ'))
+                    wavelength: int = 3  #Wavelengths (3, (' 193', ' 248', ' 532', '1064', '2100', '2940'))
                 
-                
-                std::cout << "OPHIR SETTINGS!!!\n\n" << std::endl;
-                
-                th->init = true;
-                //this->arm();
+                    self.OphirCOM.SetMeasurementMode(self.DeviceHandle, 0, self.measurement_mode)
+                    self.OphirCOM.SetPulseLength(self.DeviceHandle, 0, self.pulse_length)
+                    self.OphirCOM.SetRange(self.DeviceHandle, 0, self.measurement_range)
+                    self.OphirCOM.SetWavelength(self.DeviceHandle, 0, self.wavelength)
+                    */
+                    /*
+                    LONG count = 0;
+                    OphirLM.GetDiffuser(hDevice, 0, count, results);
+                    std::cout << "Diffuser:" << std::endl;
+                    for(auto& var: results){
+                        std::wcout << var << std::endl;
+                    }
+
+                    OphirLM.GetMeasurementMode(hDevice, 0, count, results);
+                    std::cout << "\nMModes:" << std::endl;
+                    for(auto& var: results){
+                        std::wcout << var << std::endl;
+                    }
+
+                    OphirLM.GetPulseLengths(hDevice, 0, count, results);
+                    std::cout << "\nPulseLengths:" << std::endl;
+                    for(auto& var: results){
+                        std::wcout << var << std::endl;
+                    }
+
+                    OphirLM.GetRanges(hDevice, 0, count, results);
+                    std::cout << "\nRanges:" << std::endl;
+                    for(auto& var: results){
+                        std::wcout << var << std::endl;
+                    }
+
+                    OphirLM.GetWavelengths(hDevice, 0, count, results);
+                    std::cout << "\nWls:" << std::endl;
+                    for(auto& var: results){
+                        std::wcout << var << std::endl;
+                    }
+                    */
+                    OphirLM.SetDiffuser(hDevice, th->channel, (long)th->diag->storage.config["laser"][0]["ophir"]["diffuser"]);
+                    OphirLM.SetMeasurementMode(hDevice, th->channel, (long)th->diag->storage.config["laser"][0]["ophir"]["mMode"]);
+                    OphirLM.SetPulseLength(hDevice, th->channel, (long)th->diag->storage.config["laser"][0]["ophir"]["pulseLength"]);
+                    OphirLM.SetRange(hDevice, th->channel, (long)th->diag->storage.config["laser"][0]["ophir"]["range"]);
+                    OphirLM.SetWavelength(hDevice, th->channel, (long)th->diag->storage.config["laser"][0]["ophir"]["wavelength"]);
+                    
+                    th->init = true;
+                }
             }
-    
-            
         }catch (const _com_error& e){
             th->init = false;
             std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
         }
         if(th->init){
-            std::cout << "Ophir init OK, entering command loop" << std::endl;
-            bool stop = false;
-            while(!(stoken.stop_requested() || stop)){
+            while(!(stoken.stop_requested())){
+                
                 if(!th->armed.load() && th->requestArm.load()){
-                    std::cout << "ophir got arm request" << std::endl;
-        
                     th->energy.fill(0);
                     th->times.fill(0);
                     
@@ -93,9 +164,8 @@ void Ophir::connect(){
                                 }
                                 th->times[th->count.load()] = (unsigned long int)(timestamps[i]*1000);
                                 th->count++;
-                                if(th->count.load() > th->diag->config["laser"][0]["pulse_count"]){
-                                    stop = true;
-                                    th->armed = false;
+                                if(th->count.load() > th->diag->storage.config["laser"][0]["pulse_count"]){
+                                    th->requestDisarm = true;
                                 }
                             }
                             /*
@@ -107,12 +177,24 @@ void Ophir::connect(){
                     }catch (const _com_error& e){
                         std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
                     }
+                    if(th->requestDisarm.load()){
+                        th->requestDisarm = false;
 
+                        th->diag->storage.saveOphir(min(th->count.load(), th->energy.size()));
+                        try{
+                            OphirLM.StopAllStreams(); //stop measuring
+                        }catch (const _com_error& e){
+                            std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
+                        }
+
+                        th->armed = false;
+                    }
                 }else{
+                    using namespace std::chrono_literals;
+                    std::this_thread::sleep_for(100ms);
                     try{
                         std::wstring headSN, headType, headName;
                         OphirLM.GetSensorInfo(hDevice, th->channel, headSN, headType, headName); 
-
                     }catch (const _com_error& e){
                         std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
                     } 
@@ -121,9 +203,6 @@ void Ophir::connect(){
                 }
             }
         }
-        //save
-        th->diag->storage.saveOphir(min(th->count.load(), th->energy.size()));
-
         std::cout << "Ophir end" << std::endl;
         th->init = false;
         try{
@@ -169,20 +248,14 @@ Json Ophir::status(){
 };
 
 void Ophir::arm(){
-    std::cout << "ophir arm call" << std::endl;
-    if(this->init && !this->armed.load()){
-        std::cout << "ophir arming" << std::endl;
-
+    if(this->init.load() && !this->armed.load()){
         this->requestArm = true;   
     }
 };
 
 void Ophir::disarm(){
-    this->armed = false;
-    if(this->init.load()){
-        this->thread.request_stop();
-        this->thread.join();
+    if(this->init.load() && this->armed.load()){
+        this->requestDisarm = true;
     }
-    this->init = false;
-    //re-init in diag?
+    this->armed = false;
 };

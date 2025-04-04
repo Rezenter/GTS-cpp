@@ -11,6 +11,7 @@
 
 #include <vector>
 #include <thread>
+#include <mutex>
 
 using Json = nlohmann::json;
 
@@ -34,6 +35,9 @@ public:
     bool initialising = false;
     void arm();
     void disarm();
+    std::mutex mutex;
+    std::mutex vectorMutex;
+    void reinit();
 
 private:
     std::jthread worker;
@@ -45,6 +49,7 @@ private:
     struct sockaddr_in servaddr;
     Buffer buffer;
     std::atomic<unsigned short> current_ind = 0;
+    unsigned char boardCount = 0;
 };
 
 

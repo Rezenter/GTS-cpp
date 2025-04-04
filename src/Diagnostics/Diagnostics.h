@@ -6,7 +6,6 @@
 #define GTS_CORE_DIAGNOSTICS_H
 
 #include "string"
-#include <filesystem>
 
 #include "thread"
 #include "json.hpp"
@@ -29,7 +28,7 @@ private:
     
     //inline const static std::filesystem::directory_entry configPath {R"(d:\data\db\config_cpp\)"};
     static Json getConfigs();
-    Json loadConfig(std::string filename);
+    Json loadConfig(std::string filename, std::string spectral, std::string abs);
     Json status();
 
     void trig();
@@ -38,6 +37,7 @@ private:
     
     bool fullAuto = false;
     bool fastAuto = false;
+    bool slowAuto = false;
     bool lasAutoOn = false;
     bool lasAutoOff = true;
     bool ophirAuto = false;
@@ -58,7 +58,6 @@ public:
         coolant.setMgr(mgr);
     };
     Json handleRequest(Json& payload);
-    Json config;
     void die();
     void save();
 

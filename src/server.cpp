@@ -103,18 +103,28 @@ static void handleHTTP(struct mg_connection *c, int ev, void *ev_data) {
             
             deque.back().thread = new std::thread(threaded_reply, &deque.back());
         }else{
+            //std::cout << "req: " << hm->uri.buf << std::endl;
             char *path;
             if (hm->uri.buf[hm->uri.len - 1] == '/') {
                 path = new char[strlen(root) + hm->uri.len + strlen("index.html") + 1]();
                 std::strcpy(path, root);
                 std::memcpy(path + strlen(root), hm->uri.buf, hm->uri.len);
                 std::strcat(path, "index.html");
-            } else {
+            }else if(mg_match(hm->uri, mg_str("/pub"), NULL)){
+                
+                std::cout << "matched" << std::endl;
+                std::string pub = "//172.16.12.127/Pub/Диагностики/Томсоновская диагностика/Томсоновская диагностика (описание).pdf";
+                
+                std::cout << hm->body.buf << std::endl;
+                path = new char[pub.size() + 1]();
+                std::strcpy(path, pub.c_str());
+                //std::memcpy(path + pub.size(), hm->body.buf, hm->body.len);
+            }else{
                 path = new char[strlen(root) + hm->uri.len + 1]();
                 std::strcpy(path, root);
                 std::memcpy(path + strlen(root), hm->uri.buf, hm->uri.len);
             }
-
+            //std::cout << "Try serve file: " << path << std::endl;
             mg_http_serve_file(c, hm, path, &opts);
             delete[] path;
         }
@@ -198,6 +208,23 @@ int main() {
         deque.erase(iter);
     }
     std::cout << "Eraised qeque" << std::endl;
+
+    aProcesses[1024], cbNeeded, cProcesses;
+    if ( !EnumProcesses( aProcesses, sizeof(aProcesses), &cbNeeded ) ){
+        return 1;
+    }
+    cProcesses = cbNeeded / sizeof(DWORD);
+    ok = 0;
+    for (i = 0; i < cProcesses; i++ ){
+        if( aProcesses[i] != 0 ){
+            HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION |
+                                           PROCESS_ALL_ACCESS,
+                                           FALSE, aProcesses[i] );
+            ok += SetProcessAffinityMask(hProcess, 0b1111111111111111);
+            //std::cout  << aProcesses[i] << ' ' << SetProcessAffinityMask(hProcess, 0b1110000000000000) << std::endl;
+            CloseHandle( hProcess );
+        }
+    }
 
     mg_mgr_free(&mgr);
 
