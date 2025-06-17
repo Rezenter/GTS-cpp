@@ -332,7 +332,7 @@
                                 alert(resp.err);
                             }
                         }
-                    );" checked disabled>
+                    );" checked>
                 </td>
                 <td rowspan="2">
                     <button type="button" id="button_laser_on" onclick="Request(
@@ -387,7 +387,7 @@
             </tr>
             <tr>
                 <td colspan="8" >
-                    <p>Laser temperature oscillogram placeholder</p>
+                    <output id="temp_laser">Temperature: unknown</output>
                 </td>
             </tr>
 
@@ -473,7 +473,8 @@
         ophirLED: document.getElementById("state_ophir_OK"),
         diagArm: document.getElementById("button_diag_arm"),
         diagDisarm: document.getElementById("button_diag_disarm"),
-        diagLED: document.getElementById("state_diag_OK")
+        diagLED: document.getElementById("state_diag_OK"),
+        lasTemp: document.getElementById("temp_laser")
     };
 
     Request = function (req, callback) {
@@ -621,7 +622,7 @@
         }
 
         if(status.laser.timeout < 1000000000){
-            elements.lasStatus.value += (status.laser.timeout / 60).toFixed(0) + ':' + (status.laser.timeout % 60).toFixed(0);
+            elements.lasStatus.value += Math.floor((status.laser.timeout / 60)).toFixed(0) + ':' + (status.laser.timeout % 60).toFixed(0);
         }
 
         elements.lasEnergy.value = status.laser.delayAmp + " / " + status.laser.delayMO;
@@ -644,7 +645,7 @@
         if(status.ophir.ok){
             if(status.ophir.armed){
                 elements.ophirStatus.value = "Armed " + status.ophir.curr;
-                elements.fophirLED.style.background = "green";
+                elements.ophirLED.style.background = "green";
                 elements.ophirArm.disabled = true;
                 elements.ophirDisarm.disabled = false;
             }else{
@@ -660,7 +661,7 @@
             elements.ophirDisarm.disabled = true;
         }
         
-
+        elements.lasTemp.value = "coolant temperature: " + status.coolant.hist[status.coolant.hist.length - 1]["temperature"].toFixed(1) + " °C";
     }
 
     $(document).ready(

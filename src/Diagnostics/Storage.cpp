@@ -103,7 +103,7 @@ void Storage::saveFast() {
         Json header {
             {"config", this->config},
             {"boards", {}},
-            {"version", 3}
+            {"version", 6}
         };
 
 

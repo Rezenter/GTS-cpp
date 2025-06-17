@@ -393,7 +393,7 @@ void Link::init(){
                         }
                     }
                     using namespace std::chrono_literals;
-                    std::this_thread::sleep_for(100ms);  //not armed yet, save some CPU
+                    std::this_thread::sleep_for(200ms);  //not armed yet, save some CPU
                 }
             } 
         }

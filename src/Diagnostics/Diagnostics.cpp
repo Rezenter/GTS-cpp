@@ -264,6 +264,8 @@ void Diagnostics::disarm(){
         this->caens.disarm();
     }
     if(this->ophirAuto){
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(500ms);
         this->ophir.disarm();
     }
 

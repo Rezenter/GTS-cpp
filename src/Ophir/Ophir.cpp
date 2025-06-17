@@ -1,6 +1,15 @@
 #include "Ophir/Ophir.h"
 #include "Diagnostics/Diagnostics.h"
 
+void PlugAndPlayCallback()
+{
+	std::wcout << L"Device has been removed from the USB. \n";
+}
+
+void DataReadyCallback(long hDevice,long channel)
+{
+	std::wcout << L"data ready callback \n";
+}
 
 Ophir::~Ophir(){
     std::cout << "Ophir destructor" << std::endl;
@@ -114,6 +123,7 @@ void Ophir::connect(){
                         std::wcout << var << std::endl;
                     }
                     */
+                   
                     OphirLM.SetDiffuser(hDevice, th->channel, (long)th->diag->storage.config["laser"][0]["ophir"]["diffuser"]);
                     OphirLM.SetMeasurementMode(hDevice, th->channel, (long)th->diag->storage.config["laser"][0]["ophir"]["mMode"]);
                     OphirLM.SetPulseLength(hDevice, th->channel, (long)th->diag->storage.config["laser"][0]["ophir"]["pulseLength"]);
@@ -128,13 +138,18 @@ void Ophir::connect(){
             std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
         }
         if(th->init){
+            MSG Msg;
             while(!(stoken.stop_requested())){
                 
                 if(!th->armed.load() && th->requestArm.load()){
                     th->energy.fill(0);
                     th->times.fill(0);
                     
-                    try{      
+                    try{
+                        OphirLM.ConfigureStreamMode(hDevice, th->channel, 0, 0); // (handle, channel, mode 0=turbo, true/false)
+                        OphirLM.ConfigureStreamMode(hDevice, th->channel, 2, 0); // (handle, channel, mode 2=immediate, true/false)
+                        //OphirLM.RegisterPlugAndPlay(PlugAndPlayCallback);	
+			            //OphirLM.RegisterDataReady(DataReadyCallback);
                         OphirLM.StartStream(hDevice, th->channel);
                     }catch (const _com_error& e){
                         std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
@@ -146,6 +161,11 @@ void Ophir::connect(){
                 }
                 if(th->armed.load()){
                     try{
+                        /*
+                        //GetMessage(&Msg, NULL, 0, 0);
+                        //TranslateMessage(&Msg);
+                        //DispatchMessage(&Msg);
+
                         std::vector<double> values; //Joul
                         std::vector<double> timestamps; //ms
                         std::vector<OphirLMMeasurement::Status> statuses; //0 = ok
@@ -165,28 +185,62 @@ void Ophir::connect(){
                                 th->times[th->count.load()] = (unsigned long int)(timestamps[i]*1000);
                                 th->count++;
                                 if(th->count.load() > th->diag->storage.config["laser"][0]["pulse_count"]){
+                                    std::cout << "ophir self disarmed" << std::endl;
                                     th->requestDisarm = true;
                                 }
                             }
-                            /*
-                            std::wcout << L"Timestamp: " << std::fixed << std::setprecision(3) << timestamps[i]
-                                << L" Reading: " << std::scientific << values[i] << L" Status: " << statuses[i]<< L"\n"; 
-                        */
+                    
+                            //std::wcout << L"Timestamp: " << std::fixed << std::setprecision(3) << timestamps[i]
+                            //    << L" Reading: " << std::scientific << values[i] << L" Status: " << statuses[i]<< L"\n"; 
+                        
                         }
+                            */
+                        /*
+                        if(values.size()){
+                            std::cout << "end of readout" << std::endl;
+                        }*/
+                        using namespace std::chrono_literals;
+                        std::this_thread::sleep_for(100ms);
                         th->timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();             
                     }catch (const _com_error& e){
                         std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
                     }
                     if(th->requestDisarm.load()){
                         th->requestDisarm = false;
-
-                        th->diag->storage.saveOphir(min(th->count.load(), th->energy.size()));
                         try{
+                            std::vector<double> values; //Joul
+                            std::vector<double> timestamps; //ms
+                            std::vector<OphirLMMeasurement::Status> statuses; //0 = ok
+                            using namespace std::chrono_literals;
+                            std::cout << "sleep for ophir buffer" << std::endl;
+                            std::this_thread::sleep_for(500ms);
+                            OphirLM.GetData(hDevice, th->channel, values, timestamps, statuses);
+                            
+                            for(size_t i = 0; i < values.size(); ++i){
+                                if(statuses[i] == OphirLMMeasurement::Status::frequency){
+                                    //skip trash
+                                }else{
+                                
+                                    if(statuses[i] == OphirLMMeasurement::Status::ok){
+                                        th->energy[th->count.load()] = values[i];
+                                    }else{
+                                        th->energy[th->count.load()] = -statuses[i]; //store error
+                                    }
+                                    th->times[th->count.load()] = (unsigned long int)(timestamps[i]*1000);
+                                    th->count++;
+                                }
+                                /*
+                                std::wcout << L"Timestamp: " << std::fixed << std::setprecision(3) << timestamps[i]
+                                    << L" Reading: " << std::scientific << values[i] << L" Status: " << statuses[i]<< L"\n"; 
+                            */
+                            }
                             OphirLM.StopAllStreams(); //stop measuring
+                            
                         }catch (const _com_error& e){
                             std ::wcout << L"Error 0x" << std::hex << e.Error() << L" " << e.Description()  << L"\n";
                         }
-
+                        std::cout << "request ophir save: " << th->count.load() << " vs " << th->energy.size() << std::endl;
+                        th->diag->storage.saveOphir(min(th->count.load(), th->energy.size()));
                         th->armed = false;
                     }
                 }else{
@@ -255,6 +309,9 @@ void Ophir::arm(){
 
 void Ophir::disarm(){
     if(this->init.load() && this->armed.load()){
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(500ms);
+        std::cout << "ophir got " << this->count.load() << " before disarm" << std::endl;
         this->requestDisarm = true;
     }
     this->armed = false;

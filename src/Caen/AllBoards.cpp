@@ -216,6 +216,7 @@ void AllBoards::arm() {
            sizeof(this->servaddr));
 */
     this->current_ind = 0;
+
     this->worker = std::jthread([&links = this->links, &armed = this->armed, &diag = this->diag, &current = this->current_ind](std::stop_token stoken){
         //unsigned long long mask = 1 << 8; //allowed: 0b0001111100000000
         SetThreadAffinityMask(GetCurrentThread(), 1 << 8);
@@ -261,6 +262,13 @@ void AllBoards::arm() {
         armed = false;
         
         diag->storage.saveFast();
+        current = 0;
+        for(auto& link: links){
+            if(link->ok.load() && link->nodes.size() > 0){
+                auto& node = link->nodes[0];
+                node->evCount = 0;
+            }
+        }
         return;
     });
     
