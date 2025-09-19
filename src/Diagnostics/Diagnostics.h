@@ -29,7 +29,7 @@ private:
     //inline const static std::filesystem::directory_entry configPath {R"(d:\data\db\config_cpp\)"};
     static Json getConfigs();
     Json loadConfig(std::string filename, std::string spectral, std::string abs);
-    Json status();
+
 
     void trig();
     void arm();
@@ -58,6 +58,7 @@ public:
         coolant.setMgr(mgr);
     };
     Json handleRequest(Json& payload);
+    Json status();
     void die();
     void save();
 

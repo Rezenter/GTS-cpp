@@ -103,7 +103,8 @@ void Storage::saveFast() {
         Json header {
             {"config", this->config},
             {"boards", {}},
-            {"version", 6}
+            {"version", 6},
+            {"diag", {}}
         };
 
 
@@ -139,7 +140,7 @@ void Storage::saveFast() {
                 link->requestSave = false;
             }
         }
-
+        header["diag"] = this->diag->status();
         
         outFile.open(this->currentPath.path().string() + "header.json");
         outFile <<  header.dump(2) << std::endl;
