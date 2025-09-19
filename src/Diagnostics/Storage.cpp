@@ -479,6 +479,26 @@ bool Storage::check(Json& candidate){
         return false;
     }
 
+    if(!candidate.contains("RT")){
+        std::cout << "config has no 'RT'" << std::endl;
+        return false;
+    }
+    if(!candidate["RT"].contains("ip")){
+        std::cout << "config has no RT::ip'" << std::endl;
+        return false;
+    }
+    if(!candidate["RT"].contains("port")){
+        std::cout << "config has no RT::port'" << std::endl;
+        return false;
+    }
+    if(!candidate["RT"].contains("emulate")){
+        std::cout << "config has no RT::emulate'" << std::endl;
+        return false;
+    }
+    if(!candidate["RT"].contains("path")){
+        std::cout << "config has no RT::path'" << std::endl;
+        return false;
+    }
     return true;
 }
 

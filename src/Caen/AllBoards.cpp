@@ -7,6 +7,10 @@
 
 #include "iostream"
 
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+
 Json AllBoards::init() {
     if(this->initialised){
         if(this->armed){
@@ -103,6 +107,60 @@ Json AllBoards::init() {
 */
     this->initialised = true;
     this->reinit();
+
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(diag->storage.config["RT"]["port"]);
+    std::string addr = diag->storage.config["RT"]["ip"].template get<std::string>();
+    servaddr.sin_addr.s_addr = inet_addr(addr.c_str());
+
+    this->polyCount = diag->storage.config["poly"].size();
+    this->eventSize = sizeof(short) + sizeof(char) + this->polyCount*sizeof(Poly);
+    this->shots = new char[params.pulseCount*this->eventSize];
+
+    if(diag->storage.config["RT"]["emulate"]){
+        this->emulate = true;
+        //json load
+
+        std::filesystem::directory_entry emulateFile {diag->storage.config["RT"]["path"]};
+        if(!emulateFile.exists()){
+            std::cout << "WTF? emulate file not found: " << emulateFile.path().string() << std::endl;
+            return false;
+        }
+
+        std::ifstream file;
+        file.open(emulateFile);
+        Json donor = Json::parse(file);
+        file.close();
+
+
+
+        std::cout << "warning! Reading file fo emulation without checks." << std::endl;
+        for(unsigned short i = 0; i < params.pulseCount; i++){
+            char* ptr = this->shots + this->eventSize*i;
+            std::memcpy(ptr, &i, sizeof(short));
+            std::memcpy(ptr + sizeof(short), &this->polyCount, sizeof(char));
+            ptr += sizeof(short) + sizeof(char);
+            for(unsigned char polyIndex = 0; polyIndex < this->polyCount; polyIndex++){
+                Poly tmp = Poly{donor["config"]["poly"][polyIndex]["R"],
+                                0,
+                                0,
+                                1e33,
+                                1e33};
+                if(donor["events"][i].contains("T_e") and donor["events"][i]["T_e"][polyIndex].contains("T")){
+                    tmp = Poly{donor["config"]["poly"][polyIndex]["R"],
+                                    donor["events"][i]["T_e"][polyIndex]["T"],
+                                    donor["events"][i]["T_e"][polyIndex]["n"],
+                                    donor["events"][i]["T_e"][polyIndex]["Terr"],
+                                    donor["events"][i]["T_e"][polyIndex]["n_err"]};
+                }
+                std::memcpy(ptr, &tmp, sizeof(Poly));
+                ptr += sizeof(Poly);
+            }
+        }
+    }
 
     return {
             {"ok", true}
@@ -217,7 +275,7 @@ void AllBoards::arm() {
 */
     this->current_ind = 0;
 
-    this->worker = std::jthread([&links = this->links, &armed = this->armed, &diag = this->diag, &current = this->current_ind](std::stop_token stoken){
+    this->worker = std::jthread([&links = this->links, &armed = this->armed, &diag = this->diag, &current = this->current_ind, &shots=this->shots, &polyCount=this->polyCount, &eventSize=this->eventSize, &sockfd=this->sockfd, &servaddr=this->servaddr](std::stop_token stoken){
         //unsigned long long mask = 1 << 8; //allowed: 0b0001111100000000
         SetThreadAffinityMask(GetCurrentThread(), 1 << 8);
         //std::cout << "AllBoards thread: " << SetThreadAffinityMask(GetCurrentThread(), mask) << " " << GetCurrentThreadId() << std::endl;
@@ -245,7 +303,13 @@ void AllBoards::arm() {
 
                 //check once
                 //std::cout << "ready event " << current.load() << std::endl;
-                
+                if(current.load() != 0){
+                    sendto(sockfd, shots + eventSize*(current.load()-1),
+                           sizeof(short) + sizeof(char) + polyCount*sizeof(Poly),
+                           0, (const struct sockaddr *) &servaddr,
+                           sizeof(servaddr));
+                }
+
                 /*
                 sendto(sockfd, buffer.chars, 4,
                        0, (const struct sockaddr *) &servaddr,
@@ -254,8 +318,8 @@ void AllBoards::arm() {
 
                 current++;
 
-                if(current.load() == 1000){
-                    std::cout << "RT got 1000" << std::endl;
+                if(current.load() == 101){
+                    std::cout << "RT got 101" << std::endl;
                 }
             }
         }
@@ -298,6 +362,8 @@ AllBoards::~AllBoards() {
         this->links.pop_back();
     }
     this->vectorMutex.unlock();
+    closesocket(this->sockfd);
+    delete[] this->shots;
     std::cout << "allBoards destructor OK" << std::endl;
 }
 
