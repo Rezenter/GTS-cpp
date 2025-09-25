@@ -38,3 +38,6 @@ add_executable(testOphir src/Ophir/debug.cpp include/OphirLMMeasurement.h includ
 
 add_executable(testCaen src/Caen/test.cpp)
 target_link_libraries(testCaen ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.lib)
+
+add_executable(testUDP src/test/testUDP.cpp)
+target_link_libraries(testUDP wsock32 ws2_32 )

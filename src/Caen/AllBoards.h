@@ -18,7 +18,7 @@ using Json = nlohmann::json;
 class Diagnostics;
 
 struct Poly{
-    unsigned short R;
+    uint32_t R;
     float Te;
     float ne;
     float Te_err;
@@ -29,11 +29,6 @@ struct LaserShot{
     unsigned short shotCount;
     unsigned char polyCount;
     Poly* poly;
-};
-
-union Buffer{
-    unsigned short int val[2];
-    char chars[4];
 };
 
 
@@ -60,7 +55,6 @@ private:
     bool initialised = false;
     SOCKET sockfd;
     struct sockaddr_in servaddr;
-    Buffer buffer;
     std::atomic<unsigned short> current_ind = 0;
     unsigned char boardCount = 0;
     bool emulate = false;

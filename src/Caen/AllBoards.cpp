@@ -112,7 +112,8 @@ Json AllBoards::init() {
 
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(diag->storage.config["RT"]["port"]);
+    servaddr.sin_port = htons(6200);
+    //servaddr.sin_port = htons(diag->storage.config["RT"]["port"]);
     std::string addr = diag->storage.config["RT"]["ip"].template get<std::string>();
     servaddr.sin_addr.s_addr = inet_addr(addr.c_str());
 
@@ -266,13 +267,6 @@ void AllBoards::arm() {
     }
     this->vectorMutex.unlock();
 
-    this->buffer.val[0] = 0;
-    this->buffer.val[1] = 0;
-    /*
-    sendto(this->sockfd, this->buffer.chars, 4,
-           0, (const struct sockaddr *) &this->servaddr,
-           sizeof(this->servaddr));
-*/
     this->current_ind = 0;
 
     this->worker = std::jthread([&links = this->links, &armed = this->armed, &diag = this->diag, &current = this->current_ind, &shots=this->shots, &polyCount=this->polyCount, &eventSize=this->eventSize, &sockfd=this->sockfd, &servaddr=this->servaddr](std::stop_token stoken){
@@ -303,18 +297,15 @@ void AllBoards::arm() {
 
                 //check once
                 //std::cout << "ready event " << current.load() << std::endl;
+
                 if(current.load() != 0){
                     sendto(sockfd, shots + eventSize*(current.load()-1),
                            sizeof(short) + sizeof(char) + polyCount*sizeof(Poly),
                            0, (const struct sockaddr *) &servaddr,
                            sizeof(servaddr));
+
                 }
 
-                /*
-                sendto(sockfd, buffer.chars, 4,
-                       0, (const struct sockaddr *) &servaddr,
-                       sizeof(servaddr));
-                */
 
                 current++;
 
