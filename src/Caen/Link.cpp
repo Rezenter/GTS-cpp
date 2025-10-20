@@ -229,8 +229,7 @@ void Link::init(){
             unsigned int short currentCell = 0;
             Timestamp timestampConverter;
             unsigned short event_ind = 0;
-            while(!(stoken.stop_requested())){ 
-                
+            while(!(stoken.stop_requested())){
                 
                 if(!th->armed.load() && th->requestArm.load()){  
                     th->requestDisarm = false;
@@ -304,8 +303,6 @@ void Link::init(){
                                             } else if (node->signalInd[ch1].first < currentCell && currentCell <= node->signalInd[ch1].second) {
                                                 node->ph_el[node->evCount][ch1] += node->result[node->evCount][ch1][currentCell];
                                             }
-                    
-
 
                                             node->result[node->evCount][ch2][sector * 16 + cell] =
                                                     *reinterpret_cast<unsigned short *>((group_pointer + 4 * cell + 1)) >> 4;

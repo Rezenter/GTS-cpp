@@ -368,6 +368,9 @@
                     <button type="button" id="button_laser_trig" disabled>Trig.</button>
                 </td>
             </tr>
+
+
+
             <tr>
                 <td>
                     <label for="checkbox_auto_laser_off">Auto Off</label><input type="checkbox" id="checkbox_auto_laser_off" onclick="Request(
@@ -388,6 +391,67 @@
             <tr>
                 <td colspan="8" >
                     <output id="temp_laser">Temperature: unknown</output>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    <p>T15 polys</p>
+                </td>
+                <td>
+                    <output id="lag_t15">999999</output>
+                </td>
+                <td id="state_t15_OK" style="background-color:yellow;">
+                </td>
+                <td>
+                    <output id="state_t15">Unknown</output>
+                </td>
+
+                <td>
+                    <label for="checkbox_auto_t15_on">Auto ON</label><input type="checkbox" id="checkbox_auto_t15_on" onclick="Request(
+                        {
+                            subsystem: 'diag',
+                            reqtype: 'autot15On',
+                            state: elements.autot15On.checked
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );" checked>
+                </td>
+                <td>
+                    <button type="button" id="button_t15_on" onclick="Request(
+                        {
+                            subsystem: 't15',
+                            reqtype: 'arm'
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );" disabled>Arm</button>
+                </td>
+                <td>
+                    <button type="button" id="button_t15_off" onclick="Request(
+                        {
+                            subsystem: 't15',
+                            reqtype: 'disarm'
+                        }
+                        , function (resp) {
+                            if(!resp.ok){
+                                console.log(resp);
+                                alert(resp.err);
+                            }
+                        }
+                    );">Disarm</button>
+                </td>
+                <td>
+                    <button type="button" id="button_t15_trig" disabled>Trig.</button>
                 </td>
             </tr>
 
