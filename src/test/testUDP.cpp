@@ -57,7 +57,7 @@ int main() {
         ptr += sizeof(Poly);
     }
 
-
+    std::cout << sizeof(short) + sizeof(char) << ' ' << sizeof(short) + sizeof(char) + polyCount*sizeof(Poly) << std::endl;
 
     while(1){
         std::cout << "send " << sendto(sockfd, shots,

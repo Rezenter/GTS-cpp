@@ -146,6 +146,8 @@ Json Diagnostics::handleRequest(Json& payload){
             resp = this->caens.handleRequest(payload);
         }else if(payload.at("subsystem") == "ophir"){
             resp = this->ophir.handleRequest(payload);
+        }else if(payload.at("subsystem") == "slow"){
+            resp = this->allSlow.handleRequest(payload);
         }else{
             resp = {
                     {"ok", false},
@@ -225,6 +227,11 @@ void Diagnostics::arm(){
     }
     this->savedOphir = !this->ophirAuto;
 
+    if(this->slowAuto){
+        this->allSlow.arm();
+    }
+    this->savedSlow = !this->slowAuto;
+
     //expecting save thread?
     this->saving = std::jthread([th=this](std::stop_token stoken){
         bool done = false;
@@ -251,6 +258,7 @@ void Diagnostics::arm(){
             std::cout << "WARNING! saving deadline missed, some data is not saved" << std::endl;
             std::cout << "caens: " << th->savedFast << std::endl;
             std::cout << "Ophir: " << th->savedOphir << std::endl;
+            std::cout << "Slow: " << th->savedSlow << std::endl;
         }
         th->storage.disarm();
     });
@@ -267,6 +275,11 @@ void Diagnostics::disarm(){
         using namespace std::chrono_literals;
         std::this_thread::sleep_for(500ms);
         this->ophir.disarm();
+    }
+    if(this->slowAuto){
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(3s);
+        this->allSlow.disarm();
     }
 
     //save laser status
@@ -347,6 +360,8 @@ Json Diagnostics::loadConfig(std::string filename, std::string spectral, std::st
 
     this->ophir.connect();
 
+    this->allSlow.init();
+
     this->caens.initialising = true;
     this->caens.init();
     this->caens.initialising = false;
@@ -375,13 +390,15 @@ Json Diagnostics::status() {
             {"coolant", this->coolant.status()},
             {"caens", this->caens.status()},
             {"ophir", this->ophir.status()},
+            {"slow", this->allSlow.status()},
             {"auto", {
                     {"isPlasma", this->isPlasma},
                     {"full", this->fullAuto},
                     {"fast", this->fastAuto},
                     {"lasOn", this->lasAutoOn},
                     {"lasOff", this->lasAutoOff},
-                    {"ophir", this->ophirAuto}
+                    {"ophir", this->ophirAuto},
+                    {"slow", this->slowAuto}
                 }
             }
     };

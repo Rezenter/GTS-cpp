@@ -270,6 +270,7 @@ void AllBoards::arm() {
 
         bool stopped = false;
         unsigned short ready = USHRT_MAX;
+        unsigned short currentLocal;
         while(!(stoken.stop_requested() || stopped)){
             ready = USHRT_MAX;
             stopped = true;
@@ -285,28 +286,26 @@ void AllBoards::arm() {
                 }
                 stopped &= !(link->armed.load() || link->requestArm.load());
             }
-            
+
             while(ready > current.load()){
+                 currentLocal = current.load();
                 // send UDP
 
                 //check once
                 //std::cout << "ready event " << current.load() << std::endl;
 
-                if(current.load() != 0){
-                    /*
-                    sendto(sockfd, shots + eventSize*(current.load()-1),
+                if(currentLocal != 0){
+                    sendto(sockfd, shots + eventSize*(currentLocal-1),
                            sizeof(short) + sizeof(char) + polyCount*sizeof(Poly),
                            0, (const struct sockaddr *) &servaddr,
                            sizeof(servaddr));
-                    */
                 }
 
-
-                current++;
-
-                if(current.load() == 101){
+                if(currentLocal == 100){
                     std::cout << "RT got 101" << std::endl;
                 }
+
+                current++;
             }
         }
         armed = false;

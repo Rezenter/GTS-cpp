@@ -14,6 +14,7 @@
 #include "Caen/AllBoards.h"
 #include "Ophir/Ophir.h"
 #include "Diagnostics/Storage.h"
+#include "Slow/AllSlow.h"
 
 using Json = nlohmann::json;
 
@@ -22,8 +23,6 @@ using Json = nlohmann::json;
 class Diagnostics {
 
 private:
-    mg_mgr* mgr;
-
     Coolant coolant;
     
     //inline const static std::filesystem::directory_entry configPath {R"(d:\data\db\config_cpp\)"};
@@ -44,13 +43,17 @@ private:
     std::jthread saving;
 
 public:
+    mg_mgr* mgr;
     bool isPlasma = true;
     Laser330 laser;
     Storage storage;
     AllBoards caens;
     Ophir ophir;
+    //Slow slow;
+    AllSlow allSlow;
 
-    Diagnostics(): caens(this), storage(this), mgr{nullptr}, ophir(this){};
+    Diagnostics(): caens(this), storage(this), mgr{nullptr}, ophir(this), allSlow(this){};
+
     static void handleUDPBroadcast(struct mg_connection *c, int ev, void *ev_data);
     void setMgr(mg_mgr *mgr){
         this->mgr = mgr;
@@ -64,6 +67,7 @@ public:
 
     bool savedFast = false;
     bool savedOphir = false;
+    bool savedSlow = false;
 };
 
 

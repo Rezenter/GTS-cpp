@@ -29,7 +29,7 @@ add_executable(GTS-core src/server.cpp
         src/Diagnostics/Storage.cpp src/Diagnostics/Storage.h
         src/Ophir/Ophir.cpp src/Ophir/Ophir.h
         include/OphirLMMeasurement.h include/OphirLMMeasurement.cpp
-        )
+        src/Slow/Slow.cpp src/Slow/Slow.h src/Slow/AllSlow.cpp src/Slow/AllSlow.h)
 target_link_libraries(GTS-core ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.lib wsock32 ws2_32 )
 
 add_executable(test1 sandbox/test1.cpp)
@@ -41,3 +41,12 @@ target_link_libraries(testCaen ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.lib
 
 add_executable(testUDP src/test/testUDP.cpp)
 target_link_libraries(testUDP wsock32 ws2_32 )
+
+add_executable(setAffinity src/utils/setAffinity.cpp)
+
+add_executable(resetAffinity src/utils/resetAffinity.cpp)
+
+add_executable(timeMeasure src/test/timeMeasure.cpp include/json.hpp)
+target_link_libraries(timeMeasure wsock32 ws2_32)
+
+add_executable(exampleRaw src/test/exampleRaw.cpp)
